@@ -45,9 +45,9 @@ final class PersonalRecordAppService
     }
 
     /** @return array{activities: list<array<string, mixed>>} */
-    public function listActivities(): array
+    public function listActivities(?string $q, ?string $activityType, int $limit, int $offset): array
     {
-        $list = $this->recordActivityCatalogRepository->findActiveOrdered();
+        $list = $this->recordActivityCatalogRepository->searchActive($q, $activityType, $limit, $offset);
         return [
             'activities' => array_map(
                 static fn ($a) => [

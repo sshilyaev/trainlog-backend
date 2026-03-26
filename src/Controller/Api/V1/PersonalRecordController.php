@@ -58,8 +58,18 @@ final class PersonalRecordController extends AbstractApiController
     }
 
     #[Route('/records/activities', name: 'record_activities_list', methods: ['GET'])]
-    public function listActivities(): JsonResponse
+    public function listActivities(Request $request): JsonResponse
     {
-        return ApiResponse::success($this->personalRecordAppService->listActivities());
+        $q = $request->query->get('q');
+        $activityType = $request->query->get('activityType');
+        $limit = (int) ($request->query->get('limit') ?? 200);
+        $offset = (int) ($request->query->get('offset') ?? 0);
+
+        return ApiResponse::success($this->personalRecordAppService->listActivities(
+            is_string($q) ? $q : null,
+            is_string($activityType) ? $activityType : null,
+            $limit,
+            $offset
+        ));
     }
 }

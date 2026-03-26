@@ -31,6 +31,40 @@ final class RecordActivityCatalogRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return list<RecordActivityCatalog>
+     */
+    public function searchActive(?string $q, ?string $activityType, int $limit, int $offset): array
+    {
+        $limit = max(1, min($limit, 500));
+        $offset = max(0, $offset);
+
+        $qb = $this->createQueryBuilder('a')
+            ->andWhere('a.isActive = true');
+
+        $q = $q !== null ? trim($q) : '';
+        if ($q !== '') {
+            $qb
+                ->andWhere('(LOWER(a.name) LIKE :q OR LOWER(a.slug) LIKE :q)')
+                ->setParameter('q', '%' . mb_strtolower($q) . '%');
+        }
+
+        $activityType = $activityType !== null ? trim($activityType) : '';
+        if ($activityType !== '') {
+            $qb
+                ->andWhere('a.activityType = :activityType')
+                ->setParameter('activityType', $activityType);
+        }
+
+        return $qb
+            ->orderBy('a.displayOrder', 'ASC')
+            ->addOrderBy('a.name', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findActiveBySlug(string $slug): ?RecordActivityCatalog
     {
         return $this->createQueryBuilder('a')
