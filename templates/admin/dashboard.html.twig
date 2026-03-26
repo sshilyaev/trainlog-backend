@@ -1,0 +1,88 @@
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block content_title %}Дашборд{% endblock %}
+
+{% block main %}
+<div class="dashboard">
+    <p class="dashboard-intro">Клик по карточке — переход к разделу.</p>
+
+    <div class="dashboard-sections">
+        {% for sectionTitle, stats in sections %}
+            <section class="dashboard-section">
+                <h2 class="dashboard-section__title">{{ sectionTitle }}</h2>
+                <div class="dashboard-grid">
+                    {% for stat in stats %}
+                        <a href="{{ stat.url }}" class="dashboard-card">
+                            <span class="dashboard-card__icon"><i class="fa {{ stat.icon }}"></i></span>
+                            <span class="dashboard-card__count">{{ stat.count }}</span>
+                            <span class="dashboard-card__label">{{ stat.label }}</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.dashboard { padding: 0.25rem 0; }
+.dashboard-intro { color: var(--bs-secondary-color, #6c757d); margin-bottom: 0.75rem; font-size: 0.8rem; }
+.dashboard-sections {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+@media (max-width: 1200px) {
+    .dashboard-sections { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+    .dashboard-sections { grid-template-columns: 1fr; }
+}
+.dashboard-section { margin-bottom: 0; }
+.dashboard-section__title {
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--bs-secondary-color, #6c757d); margin-bottom: 0.4rem; padding-bottom: 0.2rem;
+    border-bottom: 1px solid var(--ea-border-color, #dee2e6);
+}
+.dashboard-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.dashboard-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    gap: 0 0.5rem;
+    align-items: center;
+    padding: 0.4rem 0.6rem;
+    background: var(--ea-content-bg, #fff);
+    border: 1px solid var(--ea-border-color, #dee2e6);
+    border-radius: 6px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.dashboard-card:hover {
+    border-color: var(--ea-color-primary, #0d6efd);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.dashboard-card__icon {
+    grid-row: 1 / -1;
+    font-size: 1rem;
+    opacity: 0.9;
+    color: var(--ea-color-primary, #0d6efd);
+}
+.dashboard-card__count {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.dashboard-card__label {
+    font-size: 0.7rem;
+    color: var(--bs-secondary-color, #6c757d);
+    line-height: 1.2;
+}
+</style>
+{% endblock %}

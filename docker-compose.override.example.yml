@@ -1,0 +1,7 @@
+# Для локальной разработки: монтировать код в контейнер app, чтобы менять файлы без пересборки.
+# Скопировать в docker-compose.override.yml: cp docker-compose.override.example.yml docker-compose.override.yml
+# На сервере этот файл не нужен — там приложение работает из образа (без монтирования).
+services:
+  app:
+    volumes:
+      - .:/app

@@ -1,0 +1,2282 @@
+openapi: 3.0.3
+info:
+  title: TrainLog API
+  description: Backend API for TrainLog app. All API routes require Firebase ID token in Authorization header (Bearer).
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local Docker
+  - url: https://your-api.example.com
+    description: Production
+
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      summary: Health check (no auth)
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service]
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: trainlog-api }
+
+  # --- Calculators ---
+  /api/v1/calculators/catalog:
+    get:
+      operationId: getCalculatorsCatalog
+      summary: Get calculators catalog
+      tags: [Calculators]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [calculators]
+                properties:
+                  calculators:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, description, order, isEnabled, version]
+                      properties:
+                        id: { type: string }
+                        title: { type: string }
+                        description: { type: string }
+                        order: { type: integer }
+                        isEnabled: { type: boolean }
+                        version: { type: integer }
+        '401':
+          description: Auth error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/calculators/{id}/definition:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getCalculatorDefinition
+      summary: Get calculator definition (UI + expressions)
+      tags: [Calculators]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Calculator definition
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [definition]
+                properties:
+                  definition:
+                    type: object
+                    additionalProperties: true
+                    description: Dynamic calculator definition for UI and backend formulas.
+                    properties:
+                      flow:
+                        description: Optional flow config for single-step or multi-step rendering.
+                        oneOf:
+                          - type: 'null'
+                          - type: object
+                            properties:
+                              mode:
+                                type: string
+                                enum: [single, multistep]
+                              steps:
+                                type: array
+                                items:
+                                  type: object
+                                  required: [id, title, inputKeys]
+                                  properties:
+                                    id: { type: string }
+                                    title: { type: string }
+                                    subtitle: { type: string, nullable: true }
+                                    inputKeys:
+                                      type: array
+                                      items: { type: string }
+                                    nextButtonTitle: { type: string, nullable: true }
+        '404':
+          description: Calculator not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '422':
+          description: Invalid calculator definition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/calculators/{id}/calculate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: calculateWithCalculator
+      summary: Calculate outputs
+      tags: [Calculators]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inputs]
+              properties:
+                profileId: { type: string, format: uuid, nullable: true }
+                inputs:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - { type: number }
+                      - { type: string }
+      responses:
+        '200':
+          description: Calculation result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [calculatorId, outputs]
+                properties:
+                  calculatorId: { type: string }
+                  outputs:
+                    type: object
+                    additionalProperties:
+                      type: number
+                  interpretation:
+                    nullable: true
+                    type: object
+                    properties:
+                      label: { type: string }
+                      subtitle: { type: string, nullable: true }
+                  summary: { type: string, nullable: true }
+                  resultDescriptions:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      required: [title, description]
+                      properties:
+                        title: { type: string }
+                        description: { type: string }
+                  recommendations:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      required: [title, description]
+                      properties:
+                        title: { type: string }
+                        description: { type: string }
+        '404':
+          description: Calculator not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '422':
+          description: Invalid inputs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Profiles ---
+  /api/v1/profiles:
+    get:
+      operationId: listProfiles
+      summary: List my profiles
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: List of profiles for the authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profiles]
+                properties:
+                  profiles: { type: array, items: { $ref: '#/components/schemas/Profile' } }
+    post:
+      operationId: createProfile
+      summary: Create profile
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, name]
+              properties:
+                type: { type: string, enum: [coach, trainee] }
+                name: { type: string }
+                gymName: { type: string, nullable: true }
+                gender: { type: string, nullable: true, enum: [male, female] }
+                iconEmoji: { type: string, nullable: true }
+                developerMode: { type: boolean, nullable: true, description: Enable developer mode for this profile }
+      responses:
+        '201':
+          description: Created profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/profiles/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getProfile
+      summary: Get one profile
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updateProfile
+      summary: Update profile
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                gymName: { type: string, nullable: true }
+                gender: { type: string, nullable: true, enum: [male, female] }
+                iconEmoji: { type: string, nullable: true }
+                developerMode: { type: boolean, nullable: true, description: Enable developer mode for this profile }
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+    put:
+      operationId: updateProfilePut
+      summary: Update profile (same as PATCH)
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                gymName: { type: string, nullable: true }
+                gender: { type: string, nullable: true, enum: [male, female] }
+                iconEmoji: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+    delete:
+      operationId: deleteProfile
+      summary: Delete profile
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/profiles/merge:
+    post:
+      operationId: mergeProfiles
+      summary: Merge managed trainee into real trainee (coach only)
+      description: Moves all data (measurements, goals, memberships, visits, links) from managed profile to real profile and marks managed as merged.
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachProfileId, managedTraineeProfileId, realTraineeProfileId]
+              properties:
+                coachProfileId: { type: string, format: uuid }
+                managedTraineeProfileId: { type: string, format: uuid }
+                realTraineeProfileId: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Merged
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '403':
+          description: Only coach owner can merge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/profiles/{coachProfileId}/statistics:
+    get:
+      operationId: getCoachStatistics
+      summary: Coach statistics (dashboard)
+      description: |
+        Aggregated stats for a coach profile — trainees, visits, memberships.
+        Computed on request and cached for 2–5 minutes (TTL). Only the coach profile owner can request.
+      tags: [Profiles]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: coachProfileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: month
+          in: query
+          required: false
+          description: Period in YYYY-MM (default current month)
+          schema: { type: string, pattern: '^\d{4}-\d{2}$', example: '2026-03' }
+      responses:
+        '200':
+          description: Coach statistics for the period
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachStatistics' }
+        '404':
+          description: Profile not found or not coach / not owner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Measurements (under profile) ---
+  /api/v1/profiles/{profileId}/measurements:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listMeasurements
+      summary: List measurements for a profile
+      tags: [Measurements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: List of measurements (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [measurements]
+                properties:
+                  measurements: { type: array, items: { $ref: '#/components/schemas/Measurement' } }
+    post:
+      operationId: createMeasurement
+      summary: Create a measurement
+      tags: [Measurements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date: { type: string, format: date }
+                weight: { type: number, nullable: true }
+                height: { type: number, nullable: true }
+                neck: { type: number, nullable: true }
+                shoulders: { type: number, nullable: true }
+                leftBiceps: { type: number, nullable: true }
+                rightBiceps: { type: number, nullable: true }
+                waist: { type: number, nullable: true }
+                belly: { type: number, nullable: true }
+                chest: { type: number, nullable: true }
+                leftThigh: { type: number, nullable: true }
+                rightThigh: { type: number, nullable: true }
+                hips: { type: number, nullable: true }
+                buttocks: { type: number, nullable: true }
+                leftCalf: { type: number, nullable: true }
+                rightCalf: { type: number, nullable: true }
+                note: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Created measurement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Measurement' }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/profiles/{profileId}/measurements/{id}:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getMeasurement
+      summary: Get one measurement
+      tags: [Measurements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Measurement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Measurement' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updateMeasurement
+      summary: Update measurement
+      tags: [Measurements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date: { type: string, format: date }
+                weight: { type: number, nullable: true }
+                height: { type: number, nullable: true }
+                neck: { type: number, nullable: true }
+                shoulders: { type: number, nullable: true }
+                leftBiceps: { type: number, nullable: true }
+                rightBiceps: { type: number, nullable: true }
+                waist: { type: number, nullable: true }
+                belly: { type: number, nullable: true }
+                chest: { type: number, nullable: true }
+                leftThigh: { type: number, nullable: true }
+                rightThigh: { type: number, nullable: true }
+                hips: { type: number, nullable: true }
+                buttocks: { type: number, nullable: true }
+                leftCalf: { type: number, nullable: true }
+                rightCalf: { type: number, nullable: true }
+                note: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated measurement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Measurement' }
+    put:
+      operationId: updateMeasurementPut
+      summary: Update measurement (same as PATCH)
+      tags: [Measurements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date: { type: string, format: date }
+                weight: { type: number, nullable: true }
+                height: { type: number, nullable: true }
+                neck: { type: number, nullable: true }
+                shoulders: { type: number, nullable: true }
+                leftBiceps: { type: number, nullable: true }
+                rightBiceps: { type: number, nullable: true }
+                waist: { type: number, nullable: true }
+                belly: { type: number, nullable: true }
+                chest: { type: number, nullable: true }
+                leftThigh: { type: number, nullable: true }
+                rightThigh: { type: number, nullable: true }
+                hips: { type: number, nullable: true }
+                buttocks: { type: number, nullable: true }
+                leftCalf: { type: number, nullable: true }
+                rightCalf: { type: number, nullable: true }
+                note: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated measurement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Measurement' }
+    delete:
+      operationId: deleteMeasurement
+      summary: Delete measurement
+      tags: [Measurements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Goals ---
+  /api/v1/goals:
+    get:
+      operationId: listGoals
+      summary: List goals for a profile
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of goals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [goals]
+                properties:
+                  goals: { type: array, items: { $ref: '#/components/schemas/Goal' } }
+    post:
+      operationId: createGoal
+      summary: Create a goal
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profileId, measurementType, targetValue, targetDate]
+              properties:
+                profileId: { type: string, format: uuid }
+                measurementType: { type: string }
+                targetValue: { type: number }
+                targetDate: { type: string, format: date }
+      responses:
+        '201':
+          description: Created goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Goal' }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/goals/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getGoal
+      summary: Get one goal
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Goal' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updateGoal
+      summary: Update goal
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                measurementType: { type: string }
+                targetValue: { type: number }
+                targetDate: { type: string, format: date }
+      responses:
+        '200':
+          description: Updated goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Goal' }
+    put:
+      operationId: updateGoalPut
+      summary: Update goal (same as PATCH)
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                measurementType: { type: string }
+                targetValue: { type: number }
+                targetDate: { type: string, format: date }
+      responses:
+        '200':
+          description: Updated goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Goal' }
+    delete:
+      operationId: deleteGoal
+      summary: Delete goal
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Personal Records ---
+  /api/v1/profiles/{profileId}/records:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listPersonalRecords
+      summary: List personal records for a profile
+      tags: [Records]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: List of personal records (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [records]
+                properties:
+                  records: { type: array, items: { $ref: '#/components/schemas/PersonalRecord' } }
+    post:
+      operationId: createPersonalRecord
+      summary: Create personal record (owner only)
+      tags: [Records]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recordDate, sourceType, metrics]
+              properties:
+                recordDate: { type: string, format: date }
+                sourceType: { type: string, enum: [catalog, custom] }
+                activitySlug: { type: string, nullable: true, description: Required for sourceType=catalog }
+                activityName: { type: string, nullable: true, description: Required for sourceType=custom }
+                activityType: { type: string, nullable: true, description: strength/cardio/etc }
+                notes: { type: string, nullable: true }
+                metrics:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/PersonalRecordMetricInput'
+      responses:
+        '201':
+          description: Created personal record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonalRecord' }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '403':
+          description: Only owner can manage records
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/profiles/{profileId}/records/{id}:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getPersonalRecord
+      summary: Get one personal record
+      tags: [Records]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Personal record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonalRecord' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updatePersonalRecord
+      summary: Update personal record (owner only)
+      tags: [Records]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recordDate: { type: string, format: date }
+                sourceType: { type: string, enum: [catalog, custom] }
+                activitySlug: { type: string, nullable: true }
+                activityName: { type: string, nullable: true }
+                activityType: { type: string, nullable: true }
+                notes: { type: string, nullable: true }
+                metrics:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/PersonalRecordMetricInput'
+      responses:
+        '200':
+          description: Updated personal record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonalRecord' }
+    put:
+      operationId: updatePersonalRecordPut
+      summary: Update personal record (same as PATCH)
+      tags: [Records]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recordDate: { type: string, format: date }
+                sourceType: { type: string, enum: [catalog, custom] }
+                activitySlug: { type: string, nullable: true }
+                activityName: { type: string, nullable: true }
+                activityType: { type: string, nullable: true }
+                notes: { type: string, nullable: true }
+                metrics:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/PersonalRecordMetricInput'
+      responses:
+        '200':
+          description: Updated personal record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonalRecord' }
+    delete:
+      operationId: deletePersonalRecord
+      summary: Delete personal record (owner only)
+      tags: [Records]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/records/activities:
+    get:
+      operationId: listRecordActivities
+      summary: List predefined activities for personal records
+      tags: [Records]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Activities catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activities]
+                properties:
+                  activities:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RecordActivity'
+
+  # --- Calendar (unified visits + events) ---
+  /api/v1/calendar:
+    get:
+      operationId: getCalendarFeed
+      summary: Unified calendar feed (visits + events) for coach–trainee pair
+      description: Returns visits and events for the given period in one request. Same access rules as GET /visits and GET /events.
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: coachProfileId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: traineeProfileId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date, description: YYYY-MM-DD }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date, description: YYYY-MM-DD }
+      responses:
+        '200':
+          description: Visits and events for the period
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [visits, events]
+                properties:
+                  visits: { type: array, items: { $ref: '#/components/schemas/Visit' } }
+                  events: { type: array, items: { $ref: '#/components/schemas/Event' } }
+        '400':
+          description: Missing or invalid params
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Card summary (trainee card) ---
+  /api/v1/coach-profiles/{coachProfileId}/trainees/{traineeProfileId}/card-summary:
+    get:
+      operationId: getCardSummary
+      summary: All data for trainee card (profile, visits, events, memberships)
+      description: Single request instead of 4. Only coach with link to this trainee. Default calendar period is current month.
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: coachProfileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: traineeProfileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: calendarFrom
+          in: query
+          required: false
+          schema: { type: string, format: date, description: YYYY-MM-DD }
+        - name: calendarTo
+          in: query
+          required: false
+          schema: { type: string, format: date, description: YYYY-MM-DD }
+      responses:
+        '200':
+          description: Profile, visits, events, memberships
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profile, visits, events, memberships]
+                properties:
+                  profile: { $ref: '#/components/schemas/Profile' }
+                  visits: { type: array, items: { $ref: '#/components/schemas/Visit' } }
+                  events: { type: array, items: { $ref: '#/components/schemas/Event' } }
+                  memberships: { type: array, items: { $ref: '#/components/schemas/Membership' } }
+        '403':
+          description: Not linked
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Coach trainees overview ---
+  /api/v1/coach-profiles/{coachProfileId}/trainees/overview:
+    get:
+      operationId: getCoachTraineesOverview
+      summary: Aggregated trainees overview for coach home/list
+      tags: [CoachTraineeLinks]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: coachProfileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: includeArchived
+          in: query
+          required: false
+          schema: { type: boolean, default: true }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 200 }
+      responses:
+        '200':
+          description: Aggregated view for trainees list and week summary
+          headers:
+            ETag:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, example: private, max-age=30 }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [trainees, week, meta]
+                properties:
+                  trainees:
+                    type: array
+                    items:
+                      type: object
+                      required: [link, profile, activeMembershipSummary, lastVisitSummary]
+                      properties:
+                        link: { $ref: '#/components/schemas/CoachTraineeLink' }
+                        profile: { $ref: '#/components/schemas/Profile' }
+                        activeMembershipSummary:
+                          type: object
+                          nullable: true
+                          properties:
+                            id: { type: string, format: uuid }
+                            kind: { type: string, enum: [by_visits, unlimited] }
+                            status: { type: string, enum: [active, finished, cancelled] }
+                            totalSessions: { type: integer }
+                            usedSessions: { type: integer }
+                            remainingSessions: { type: integer }
+                            displayCode: { type: string, nullable: true }
+                            endDate: { type: string, format: date, nullable: true }
+                        lastVisitSummary:
+                          type: object
+                          nullable: true
+                  week:
+                    type: object
+                    required: [clientsWithDoneVisits, oneOffVisits, subscriptionVisits, range]
+                    properties:
+                      clientsWithDoneVisits: { type: integer }
+                      oneOffVisits: { type: integer }
+                      subscriptionVisits: { type: integer }
+                      range:
+                        type: object
+                        required: [from, to]
+                        properties:
+                          from: { type: string, format: date }
+                          to: { type: string, format: date }
+                  meta:
+                    type: object
+                    required: [generatedAt, page, limit, total, hasNextPage]
+                    properties:
+                      generatedAt: { type: string, format: date-time }
+                      page: { type: integer }
+                      limit: { type: integer }
+                      total: { type: integer }
+                      hasNextPage: { type: boolean }
+        '304':
+          description: Not modified (ETag matched)
+        '404':
+          description: Coach profile not found or unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Events (calendar) ---
+  /api/v1/events:
+    get:
+      operationId: listEvents
+      summary: List events for pair or one profile
+      tags: [Events]
+      security: [{ bearerAuth: [] }]
+      description: |
+        Supports two modes:
+        1) coach-trainee pair: coachProfileId + traineeProfileId
+        2) one profile context: profileId (returns events where profile is coach or trainee)
+      parameters:
+        - name: coachProfileId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: traineeProfileId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50, description: Page size (enables cursor pagination) }
+        - name: after
+          in: query
+          required: false
+          schema: { type: string, format: uuid, description: Cursor from previous page (id of last event) }
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events: { type: array, items: { $ref: '#/components/schemas/Event' } }
+                  nextCursor: { type: string, format: uuid, nullable: true, description: Present when limit used and more pages exist }
+        '400':
+          description: Missing query params (need profileId OR coachProfileId+traineeProfileId)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    post:
+      operationId: createEvent
+      summary: Create event
+      tags: [Events]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachProfileId, traineeProfileId, title, date]
+              properties:
+                coachProfileId: { type: string, format: uuid }
+                traineeProfileId: { type: string, format: uuid }
+                title: { type: string }
+                date: { type: string, format: date }
+                description: { type: string, nullable: true }
+                remind: { type: boolean, default: false }
+                colorHex: { type: string, nullable: true }
+                idempotencyKey: { type: string, nullable: true, description: Idempotency key for safe retry (24h TTL) }
+      responses:
+        '201':
+          description: Created event
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+  /api/v1/events/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEvent
+      summary: Get one event
+      tags: [Events]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Event
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updateEvent
+      summary: Update event
+      tags: [Events]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                date: { type: string, format: date }
+                description: { type: string, nullable: true }
+                remind: { type: boolean }
+                colorHex: { type: string, nullable: true }
+                isCancelled: { type: boolean }
+      responses:
+        '200':
+          description: Updated event
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    delete:
+      operationId: deleteEvent
+      summary: Delete event
+      tags: [Events]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Connection tokens ---
+  /api/v1/connection-tokens:
+    post:
+      operationId: createConnectionToken
+      summary: Create a connection token (trainee generates code for coach)
+      tags: [ConnectionTokens]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [traineeProfileId]
+              properties:
+                traineeProfileId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Token created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expiresAt]
+                properties:
+                  token: { type: string, description: Short code (e.g. 6 chars) }
+                  expiresAt: { type: string, format: date-time }
+
+  /api/v1/connection-tokens/use:
+    post:
+      operationId: useConnectionToken
+      summary: Use token to link coach and trainee
+      tags: [ConnectionTokens]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, coachProfileId]
+              properties:
+                token: { type: string }
+                coachProfileId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Link created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachTraineeLink' }
+        '409':
+          description: Trainee already linked to this coach
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/connection-tokens/preview:
+    get:
+      operationId: previewConnectionToken
+      summary: Preview trainee info by token (before linking)
+      tags: [ConnectionTokens]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Trainee preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [traineeProfileId, traineeName]
+                properties:
+                  traineeProfileId: { type: string, format: uuid }
+                  traineeName: { type: string }
+        '404':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Coach–trainee links ---
+  /api/v1/coach-trainee-links:
+    post:
+      operationId: createCoachTraineeLink
+      summary: Create link (coach adds trainee without token)
+      tags: [CoachTraineeLinks]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachProfileId, traineeProfileId]
+              properties:
+                coachProfileId: { type: string, format: uuid }
+                traineeProfileId: { type: string, format: uuid }
+                displayName: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Link created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachTraineeLink' }
+        '409':
+          description: Trainee already linked to this coach
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    get:
+      operationId: listCoachTraineeLinks
+      summary: List links (as coach or as trainee)
+      tags: [CoachTraineeLinks]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: as
+          in: query
+          required: true
+          schema: { type: string, enum: [coach, trainee] }
+        - name: embed
+          in: query
+          required: false
+          schema: { type: string, enum: [profiles], description: If profiles, response includes profiles array (trainee or coach side) }
+      responses:
+        '200':
+          description: List of links (and optionally profiles when embed=profiles)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [links]
+                properties:
+                  links: { type: array, items: { $ref: '#/components/schemas/CoachTraineeLink' } }
+                  profiles: { type: array, items: { $ref: '#/components/schemas/Profile' }, description: Present when embed=profiles }
+
+  /api/v1/coach-trainee-links/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getCoachTraineeLink
+      summary: Get one link
+      tags: [CoachTraineeLinks]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachTraineeLink' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updateCoachTraineeLink
+      summary: Update displayName, note, archived (coach only)
+      tags: [CoachTraineeLinks]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string, nullable: true }
+                note: { type: string, nullable: true }
+                archived: { type: boolean, nullable: true }
+      responses:
+        '200':
+          description: Updated link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachTraineeLink' }
+    put:
+      operationId: updateCoachTraineeLinkPut
+      summary: Update link (same as PATCH)
+      tags: [CoachTraineeLinks]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string, nullable: true }
+                note: { type: string, nullable: true }
+                archived: { type: boolean, nullable: true }
+      responses:
+        '200':
+          description: Updated link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachTraineeLink' }
+    delete:
+      operationId: deleteCoachTraineeLink
+      summary: Delete link
+      tags: [CoachTraineeLinks]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Memberships ---
+  /api/v1/memberships:
+    get:
+      operationId: listMemberships
+      summary: List memberships (by coach or by trainee)
+      tags: [Memberships]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: coachProfileId
+          in: query
+          schema: { type: string, format: uuid }
+          description: List as coach (optionally filter by trainee)
+        - name: traineeProfileId
+          in: query
+          schema: { type: string, format: uuid }
+          description: List as trainee. At least one of coachProfileId or traineeProfileId is required.
+      responses:
+        '200':
+          description: List of memberships
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [memberships]
+                properties:
+                  memberships: { type: array, items: { $ref: '#/components/schemas/Membership' } }
+        '400':
+          description: Missing coachProfileId or traineeProfileId
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    post:
+      operationId: createMembership
+      summary: Create membership (coach only)
+      tags: [Memberships]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachProfileId, traineeProfileId]
+              properties:
+                coachProfileId: { type: string, format: uuid }
+                traineeProfileId: { type: string, format: uuid }
+                kind: { type: string, enum: [by_visits, unlimited], default: by_visits }
+                totalSessions: { type: integer, minimum: 1, description: для kind=by_visits обязателен }
+                startDate: { type: string, format: date, description: для kind=unlimited обязателен }
+                endDate: { type: string, format: date, description: для kind=unlimited обязателен }
+                freezeDays: { type: integer, minimum: 0, default: 0 }
+                priceRub: { type: integer, nullable: true }
+      responses:
+        '201':
+          description: Created membership
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Membership' }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/memberships/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getMembership
+      summary: Get one membership
+      tags: [Memberships]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Membership
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Membership' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updateMembership
+      summary: Update membership (status and freezeDays, coach only)
+      tags: [Memberships]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [active, finished, cancelled] }
+                freezeDays: { type: integer, minimum: 0, description: 'For unlimited memberships; ignored for by_visits' }
+      responses:
+        '200':
+          description: Updated membership
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Membership' }
+        '422':
+          description: invalid_freeze_days
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    put:
+      operationId: updateMembershipPut
+      summary: Update membership (same as PATCH)
+      tags: [Memberships]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [active, finished, cancelled] }
+                freezeDays: { type: integer, minimum: 0, description: 'For unlimited memberships; ignored for by_visits' }
+      responses:
+        '200':
+          description: Updated membership
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Membership' }
+        '422':
+          description: invalid_freeze_days
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Nutrition plans ---
+  /api/v1/nutrition-plans:
+    get:
+      operationId: listNutritionPlans
+      summary: List nutrition plans
+      tags: [NutritionPlans]
+      security: [{ bearerAuth: [] }]
+      description: |
+        Modes:
+        1) Coach mode: coachProfileId + traineeProfileId
+        2) Trainee mode: traineeProfileId + as=trainee (optionally embed=coachProfiles)
+      parameters:
+        - name: coachProfileId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: traineeProfileId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: as
+          in: query
+          required: false
+          schema: { type: string, enum: [trainee] }
+        - name: embed
+          in: query
+          required: false
+          schema: { type: string, enum: [coachProfiles] }
+      responses:
+        '200':
+          description: Nutrition plans list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nutritionPlans]
+                properties:
+                  nutritionPlans: { type: array, items: { $ref: '#/components/schemas/NutritionPlan' } }
+                  coachProfiles: { type: array, items: { $ref: '#/components/schemas/Profile' } }
+    post:
+      operationId: createNutritionPlan
+      summary: Create nutrition plan (coach only)
+      tags: [NutritionPlans]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachProfileId, traineeProfileId, proteinPerKg, fatPerKg, carbsPerKg]
+              properties:
+                coachProfileId: { type: string, format: uuid }
+                traineeProfileId: { type: string, format: uuid }
+                proteinPerKg: { type: number, minimum: 0.000001 }
+                fatPerKg: { type: number, minimum: 0.000001 }
+                carbsPerKg: { type: number, minimum: 0.000001 }
+                weightKg: { type: number, minimum: 0.000001, nullable: true }
+                comment: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Created nutrition plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionPlan' }
+        '409':
+          description: Plan already exists for this coach-trainee pair
+        '422':
+          description: weight_required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/nutrition-plans/{id}:
+    patch:
+      operationId: updateNutritionPlan
+      summary: Update nutrition plan (coach; trainee weight-only)
+      tags: [NutritionPlans]
+      security: [{ bearerAuth: [] }]
+      description: |
+        Coach can update nutrition values (proteinPerKg/fatPerKg/carbsPerKg) and optionally comment.
+        Trainee (Дневник) can update only `weightKg` (no macros/comment), with mandatory recalculation + synchronization to `profile.weight` and today's measurement.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                proteinPerKg: { type: number, minimum: 0.000001, nullable: true }
+                fatPerKg: { type: number, minimum: 0.000001, nullable: true }
+                carbsPerKg: { type: number, minimum: 0.000001, nullable: true }
+                weightKg: { type: number, minimum: 0.000001, nullable: true }
+                comment: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated nutrition plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionPlan' }
+        '404':
+          description: Nutrition plan not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '403':
+          description: Forbidden (coach; or trainee weight-only)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '422':
+          description: weight_required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Supplements ---
+  /api/v1/supplements/catalog:
+    get:
+      operationId: listSupplementsCatalog
+      summary: List active supplement catalog entries
+      tags: [Supplements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema: { type: string, enum: [vitamin, mineral, sports_nutrition, other] }
+      responses:
+        '200':
+          description: Active supplements catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [supplements]
+                properties:
+                  supplements:
+                    type: array
+                    items: { $ref: '#/components/schemas/SupplementCatalogItem' }
+
+  /api/v1/supplements/assignments:
+    get:
+      operationId: listSupplementAssignments
+      summary: List supplement assignments for coach-trainee pair or trainee mode
+      tags: [Supplements]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: coachProfileId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: traineeProfileId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: as
+          in: query
+          required: false
+          schema: { type: string, enum: [trainee] }
+      responses:
+        '200':
+          description: Supplement assignments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignments]
+                properties:
+                  assignments:
+                    type: array
+                    items: { $ref: '#/components/schemas/SupplementAssignment' }
+        '403':
+          description: supplement_assignment_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '404':
+          description: supplement_assignment_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    post:
+      operationId: createSupplementAssignment
+      summary: Create supplement assignment (coach only)
+      tags: [Supplements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachProfileId, traineeProfileId, supplementId]
+              properties:
+                coachProfileId: { type: string, format: uuid }
+                traineeProfileId: { type: string, format: uuid }
+                supplementId: { type: string, format: uuid }
+                dosage: { type: string, nullable: true }
+                timing: { type: string, nullable: true }
+                frequency: { type: string, nullable: true }
+                note: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Assignment created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplementAssignment' }
+        '404':
+          description: supplement_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '409':
+          description: supplement_assignment_duplicate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/supplements/assignments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateSupplementAssignment
+      summary: Update supplement assignment (coach only)
+      tags: [Supplements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                supplementId: { type: string, format: uuid }
+                dosage: { type: string, nullable: true }
+                timing: { type: string, nullable: true }
+                frequency: { type: string, nullable: true }
+                note: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Assignment updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplementAssignment' }
+        '403':
+          description: supplement_assignment_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '404':
+          description: supplement_assignment_not_found or supplement_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '409':
+          description: supplement_assignment_duplicate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    put:
+      operationId: updateSupplementAssignmentPut
+      summary: Update supplement assignment (same as PATCH)
+      tags: [Supplements]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                supplementId: { type: string, format: uuid }
+                dosage: { type: string, nullable: true }
+                timing: { type: string, nullable: true }
+                frequency: { type: string, nullable: true }
+                note: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Assignment updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplementAssignment' }
+        '403':
+          description: supplement_assignment_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '404':
+          description: supplement_assignment_not_found or supplement_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '409':
+          description: supplement_assignment_duplicate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    delete:
+      operationId: deleteSupplementAssignment
+      summary: Delete supplement assignment (coach only)
+      tags: [Supplements]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+        '403':
+          description: supplement_assignment_forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '404':
+          description: supplement_assignment_not_found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  # --- Visits ---
+  /api/v1/visits:
+    get:
+      operationId: listVisits
+      summary: List visits
+      tags: [Visits]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: coachProfileId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: traineeProfileId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: month
+          in: query
+          schema: { type: string, pattern: '^\d{4}-\d{2}$', description: YYYY-MM }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50, description: Page size (enables cursor pagination) }
+        - name: after
+          in: query
+          required: false
+          schema: { type: string, format: uuid, description: Cursor from previous page (id of last visit) }
+      description: Either (coachProfileId + traineeProfileId) or only traineeProfileId. At least traineeProfileId or both are required.
+      responses:
+        '200':
+          description: List of visits
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [visits]
+                properties:
+                  visits: { type: array, items: { $ref: '#/components/schemas/Visit' } }
+                  nextCursor: { type: string, format: uuid, nullable: true, description: Present when limit used and more pages exist }
+        '400':
+          description: Missing required query params
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    post:
+      operationId: createVisit
+      summary: Mark attendance (coach only)
+      description: |
+        Creates a done visit. Optional idempotencyKey enables safe retry from offline queue.
+        If idempotencyKey was already used, server returns existing visit with 200.
+      tags: [Visits]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachProfileId, traineeProfileId, date]
+              properties:
+                coachProfileId: { type: string, format: uuid }
+                traineeProfileId: { type: string, format: uuid }
+                date: { type: string, format: date }
+                paymentStatus: { type: string, enum: [paid, debt, unpaid], nullable: true }
+                membershipId: { type: string, format: uuid, nullable: true }
+                idempotencyKey: { type: string, format: uuid, nullable: true, description: Idempotency key for offline-safe retry }
+      responses:
+        '200':
+          description: Existing visit returned for repeated idempotency key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Visit' }
+        '201':
+          description: Visit created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Visit' }
+        '400':
+          description: Validation or business rule error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+
+  /api/v1/visits/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getVisit
+      summary: Get one visit
+      tags: [Visits]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Visit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Visit' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+    patch:
+      operationId: updateVisit
+      summary: Cancel visit or set membership for debt (coach only)
+      tags: [Visits]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    status: { type: string, enum: [cancelled] }
+                - type: object
+                  properties:
+                    membershipId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated visit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Visit' }
+    put:
+      operationId: updateVisitPut
+      summary: Update visit (same as PATCH)
+      tags: [Visits]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    status: { type: string, enum: [cancelled] }
+                - type: object
+                  properties:
+                    membershipId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated visit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Visit' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Firebase ID token
+
+  schemas:
+    ApiError:
+      type: object
+      description: Error response (4xx/5xx)
+      required: [error, code]
+      properties:
+        error: { type: string, description: Human-readable message }
+        code: { type: string, description: Machine-readable code }
+        messages: { type: array, items: { type: string }, description: Validation messages when code is validation_failed }
+
+    Profile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string }
+        type: { type: string, enum: [coach, trainee] }
+        name: { type: string }
+        gymName: { type: string, nullable: true }
+        gender: { type: string, nullable: true, enum: [male, female] }
+        iconEmoji: { type: string, nullable: true }
+        developerMode: { type: boolean, description: Enable developer mode for this profile, default false }
+        weight: { type: number, nullable: true, description: Current synchronized weight (single source of truth) }
+        weightUpdatedAt: { type: string, format: date-time, nullable: true, description: Date when current weight was last updated }
+        createdAt: { type: string, format: date-time }
+
+    CoachStatistics:
+      type: object
+      description: Coach dashboard statistics (cached 2–5 min)
+      required: [period, trainees, visits, memberships]
+      properties:
+        period:
+          type: string
+          description: Period in YYYY-MM
+          example: '2026-03'
+        trainees:
+          type: object
+          required: [activeCount, newThisMonth]
+          properties:
+            activeCount: { type: integer, description: Number of non-archived coach–trainee links }
+            newThisMonth: { type: integer, description: Links created in the selected month }
+        visits:
+          type: object
+          required: [thisMonth, previousMonth, total]
+          properties:
+            thisMonth: { type: integer }
+            previousMonth: { type: integer }
+            total: { type: integer }
+            thisMonthBySubscription: { type: integer, description: Visits by membership in selected month }
+            thisMonthOneTimePaid: { type: integer, description: One-time paid visits in selected month }
+            thisMonthOneTimeDebt: { type: integer, description: One-time debt visits in selected month }
+            thisMonthCancelled: { type: integer, description: Cancelled visits in selected month }
+            previousMonthBySubscription: { type: integer }
+            previousMonthOneTimePaid: { type: integer }
+            previousMonthOneTimeDebt: { type: integer }
+            previousMonthCancelled: { type: integer }
+        memberships:
+          type: object
+          required: [activeCount, endingSoonCount]
+          properties:
+            activeCount: { type: integer, description: Active memberships count }
+            endingSoonCount: { type: integer, description: Active with 1–2 sessions left or end_date within 14 days }
+            unlimitedCount: { type: integer, description: Active unlimited memberships }
+            byVisitsCount: { type: integer, description: Active by-visits memberships }
+
+    Measurement:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        profileId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        weight: { type: number, nullable: true }
+        height: { type: number, nullable: true }
+        neck: { type: number, nullable: true }
+        shoulders: { type: number, nullable: true }
+        leftBiceps: { type: number, nullable: true }
+        rightBiceps: { type: number, nullable: true }
+        waist: { type: number, nullable: true }
+        belly: { type: number, nullable: true }
+        chest: { type: number, nullable: true }
+        leftThigh: { type: number, nullable: true }
+        rightThigh: { type: number, nullable: true }
+        hips: { type: number, nullable: true }
+        buttocks: { type: number, nullable: true }
+        leftCalf: { type: number, nullable: true }
+        rightCalf: { type: number, nullable: true }
+        note: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Goal:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        profileId: { type: string, format: uuid }
+        measurementType: { type: string }
+        targetValue: { type: number }
+        targetDate: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+
+    PersonalRecordMetricInput:
+      type: object
+      required: [metricType, value]
+      properties:
+        metricType: { type: string, enum: [weight, reps, duration, speed, distance, other] }
+        value: { type: number }
+        unit: { type: string, nullable: true, description: Required for metricType=other }
+
+    PersonalRecordMetric:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        metricType: { type: string, enum: [weight, reps, duration, speed, distance, other] }
+        value: { type: number }
+        unit: { type: string }
+        displayOrder: { type: integer }
+
+    PersonalRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        profileId: { type: string, format: uuid }
+        createdByProfileId: { type: string, format: uuid }
+        recordDate: { type: string, format: date }
+        sourceType: { type: string, enum: [catalog, custom] }
+        activityName: { type: string }
+        activityType: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonalRecordMetric'
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    RecordActivity:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        activityType: { type: string, nullable: true }
+        defaultMetrics:
+          type: array
+          items:
+            type: string
+            enum: [weight, reps, duration, speed, distance, other]
+        displayOrder: { type: integer }
+
+    CoachTraineeLink:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        coachProfileId: { type: string, format: uuid }
+        traineeProfileId: { type: string, format: uuid }
+        displayName: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        archived: { type: boolean, description: Архив (подопечный скрыт внизу списка) }
+        createdAt: { type: string, format: date-time }
+
+    Membership:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        coachProfileId: { type: string, format: uuid }
+        traineeProfileId: { type: string, format: uuid }
+        kind: { type: string, enum: [by_visits, unlimited] }
+        totalSessions: { type: integer }
+        usedSessions: { type: integer }
+        startDate: { type: string, format: date, nullable: true, description: только для kind=unlimited }
+        endDate: { type: string, format: date, nullable: true, description: только для kind=unlimited }
+        freezeDays: { type: integer, description: только для kind=unlimited }
+        priceRub: { type: integer, nullable: true }
+        status: { type: string, enum: [active, finished, cancelled] }
+        displayCode: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    NutritionPlan:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        coachProfileId: { type: string, format: uuid }
+        traineeProfileId: { type: string, format: uuid }
+        weightKgUsed: { type: number }
+        proteinPerKg: { type: number }
+        fatPerKg: { type: number }
+        carbsPerKg: { type: number }
+        proteinGrams: { type: number }
+        fatGrams: { type: number }
+        carbsGrams: { type: number }
+        calories: { type: integer }
+        comment: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Visit:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        coachProfileId: { type: string, format: uuid }
+        traineeProfileId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        status: { type: string, enum: [planned, done, cancelled, noShow] }
+        paymentStatus: { type: string, enum: [unpaid, paid, debt] }
+        membershipId: { type: string, format: uuid, nullable: true }
+        membershipDisplayCode: { type: string, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true, description: Audit timestamp when visit was cancelled (does not affect month grouping) }
+        createdAt: { type: string, format: date-time }
+
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        coachProfileId: { type: string, format: uuid }
+        traineeProfileId: { type: string, format: uuid }
+        title: { type: string }
+        date: { type: string, format: date }
+        eventDescription: { type: string, nullable: true }
+        remind: { type: boolean }
+        colorHex: { type: string, nullable: true }
+        isCancelled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    SupplementCatalogItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { type: string, enum: [vitamin, mineral, sports_nutrition, other] }
+        description: { type: string }
+        isActive: { type: boolean }
+        sortOrder: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SupplementAssignment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        coachProfileId: { type: string, format: uuid }
+        traineeProfileId: { type: string, format: uuid }
+        supplementId: { type: string, format: uuid }
+        supplement:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            type: { type: string, enum: [vitamin, mineral, sports_nutrition, other] }
+            description: { type: string }
+        dosage: { type: string, nullable: true }
+        timing: { type: string, nullable: true }
+        frequency: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
