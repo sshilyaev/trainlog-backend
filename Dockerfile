@@ -21,9 +21,9 @@ COPY . .
 RUN composer install --no-dev --no-scripts --prefer-dist 2>/dev/null || composer install --no-scripts --prefer-dist \
     && composer dump-autoload --optimize --no-dev
 
-RUN cp /app/.env.example /app/.env \
+RUN if [ -f /app/.env.example ]; then cp /app/.env.example /app/.env; else printf "APP_ENV=prod\nAPP_DEBUG=0\n" > /app/.env; fi \
     && mkdir -p /app/var/cache /app/var/log \
-    && php bin/console assets:install public --env=prod \
+    && APP_ENV=prod APP_DEBUG=0 php bin/console assets:install public --env=prod \
     && cp -a /app/public /app/public_origin \
     && chown -R www-data:www-data /app/var
 
