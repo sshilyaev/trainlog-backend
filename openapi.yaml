@@ -730,7 +730,7 @@ paths:
                 sourceType: { type: string, enum: [catalog, custom] }
                 activitySlug: { type: string, nullable: true, description: Required for sourceType=catalog }
                 activityName: { type: string, nullable: true, description: Required for sourceType=custom }
-                activityType: { type: string, nullable: true, description: strength/cardio/etc }
+                activityType: { type: string, nullable: true, description: Подкатегория активности (например: силовые, кардио, выносливость, функциональные) }
                 notes: { type: string, nullable: true }
                 metrics:
                   type: array
@@ -866,7 +866,7 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by activityType (e.g. strength, cardio).
+          description: Фильтр по подкатегории активности (например: силовые, кардио, выносливость, функциональные).
         - name: limit
           in: query
           required: false

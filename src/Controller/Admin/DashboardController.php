@@ -11,6 +11,7 @@ use App\Entity\Goal;
 use App\Entity\Measurement;
 use App\Entity\Membership;
 use App\Entity\Profile;
+use App\Entity\RecordActivityCatalog;
 use App\Entity\SupplementCatalog;
 use App\Entity\Visit;
 use Doctrine\ORM\EntityManagerInterface;
@@ -56,6 +57,9 @@ class DashboardController extends AbstractDashboardController
             'Питание' => [
                 ['label' => 'Каталог добавок', 'count' => $this->em->getRepository(SupplementCatalog::class)->count([]), 'url' => $urlGenerator->setController(SupplementCatalogCrudController::class)->setAction(Action::INDEX)->generateUrl(), 'icon' => 'fa-capsules'],
             ],
+            'Достижения' => [
+                ['label' => 'Каталог достижений', 'count' => $this->em->getRepository(RecordActivityCatalog::class)->count([]), 'url' => $urlGenerator->setController(RecordActivityCatalogCrudController::class)->setAction(Action::INDEX)->generateUrl(), 'icon' => 'fa-trophy'],
+            ],
             'Привязка' => [
                 ['label' => 'Коды привязки', 'count' => $this->em->getRepository(ConnectionToken::class)->count([]), 'url' => $urlGenerator->setController(ConnectionTokenCrudController::class)->setAction(Action::INDEX)->generateUrl(), 'icon' => 'fa-key'],
             ],
@@ -90,6 +94,8 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkTo(CalculatorDefinitionCrudController::class, 'Определения', 'fa fa-code');
         yield MenuItem::section('Питание');
         yield MenuItem::linkTo(SupplementCatalogCrudController::class, 'Каталог добавок', 'fa fa-capsules');
+        yield MenuItem::section('Достижения');
+        yield MenuItem::linkTo(RecordActivityCatalogCrudController::class, 'Каталог достижений', 'fa fa-trophy');
         yield MenuItem::section('Привязка');
         yield MenuItem::linkTo(ConnectionTokenCrudController::class, 'Коды привязки', 'fa fa-key');
     }
