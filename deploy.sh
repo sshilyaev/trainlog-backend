@@ -21,4 +21,4 @@ echo "==> Clear prod cache..."
 docker compose -f docker-compose.yaml -f docker-compose.prod.yml run --rm app php bin/console cache:clear --env=prod
 
 echo ""
-echo "=== Deploy done. Check: curl http://localhost:8080/api/v1/health ==="
+echo "=== Deploy done. Check: curl http://localhost:8081/api/v1/health ==="

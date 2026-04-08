@@ -5,7 +5,8 @@ info:
   version: 1.0.0
 
 servers:
-  - url: http://localhost:8080
+  - url: https://train.tallybase.ru
+  - url: http://localhost:8081
     description: Local Docker
   - url: https://your-api.example.com
     description: Production
