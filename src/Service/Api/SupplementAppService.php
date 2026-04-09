@@ -18,6 +18,9 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class SupplementAppService
 {
+    /** @var list<string> */
+    private const DOSAGE_UNITS = ['capsule', 'tablet', 'gram', 'milligram', 'milliliter', 'scoop', 'drop', 'serving'];
+
     public function __construct(
         private readonly SupplementCatalogRepository $supplementCatalogRepository,
         private readonly TraineeSupplementAssignmentRepository $assignmentRepository,
@@ -85,6 +88,10 @@ final class SupplementAppService
             ->setTraineeProfile($traineeProfile)
             ->setSupplement($supplement)
             ->setDosage($this->normalizeNullableString($data['dosage'] ?? null))
+            ->setDosageUnit($this->resolveDosageUnit(
+                $data['dosageUnit'] ?? null,
+                $supplement->getDefaultDosageUnit()
+            ))
             ->setTiming($this->normalizeNullableString($data['timing'] ?? null))
             ->setFrequency($this->normalizeNullableString($data['frequency'] ?? null))
             ->setNote($this->normalizeNullableString($data['note'] ?? null));
@@ -113,14 +120,23 @@ final class SupplementAppService
         $coachProfileId = $assignment->getCoachProfile()->getId();
         $traineeProfileId = $assignment->getTraineeProfile()->getId();
 
+        $supplementChanged = false;
         if (array_key_exists('supplementId', $data)) {
             $supplementId = (string) $data['supplementId'];
             $supplement = $this->assertActiveSupplement($supplementId);
             $assignment->setSupplement($supplement);
+            $supplementChanged = true;
         }
 
         if (array_key_exists('dosage', $data)) {
             $assignment->setDosage($this->normalizeNullableString($data['dosage']));
+        }
+        if (array_key_exists('dosageUnit', $data)) {
+            $assignment->setDosageUnit($this->normalizeDosageUnit($data['dosageUnit']));
+        } elseif ($supplementChanged) {
+            // If supplement was switched and dosageUnit not sent explicitly,
+            // reset to catalog default for better UX consistency.
+            $assignment->setDosageUnit($this->normalizeDosageUnit($assignment->getSupplement()->getDefaultDosageUnit()));
         }
         if (array_key_exists('timing', $data)) {
             $assignment->setTiming($this->normalizeNullableString($data['timing']));
@@ -159,6 +175,9 @@ final class SupplementAppService
         }
         if (array_key_exists('dosage', $raw)) {
             $data['dosage'] = $payload->dosage;
+        }
+        if (array_key_exists('dosageUnit', $raw)) {
+            $data['dosageUnit'] = $payload->dosageUnit;
         }
         if (array_key_exists('timing', $raw)) {
             $data['timing'] = $payload->timing;
@@ -229,6 +248,23 @@ final class SupplementAppService
         return $text === '' ? null : $text;
     }
 
+    private function normalizeDosageUnit(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = trim((string) $value);
+        if ($text === '') {
+            return null;
+        }
+        return in_array($text, self::DOSAGE_UNITS, true) ? $text : null;
+    }
+
+    private function resolveDosageUnit(mixed $requested, ?string $fallback): ?string
+    {
+        return $this->normalizeDosageUnit($requested) ?? $this->normalizeDosageUnit($fallback);
+    }
+
     /** @return array<string, mixed> */
     private function catalogToArray(SupplementCatalog $item): array
     {
@@ -239,6 +275,7 @@ final class SupplementAppService
             'description' => $item->getDescription(),
             'isActive' => $item->isActive(),
             'sortOrder' => $item->getSortOrder(),
+            'defaultDosageUnit' => $item->getDefaultDosageUnit(),
             'createdAt' => $item->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $item->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ];
@@ -261,6 +298,7 @@ final class SupplementAppService
                 'description' => $supplement->getDescription(),
             ],
             'dosage' => $item->getDosage(),
+            'dosageUnit' => $item->getDosageUnit(),
             'timing' => $item->getTiming(),
             'frequency' => $item->getFrequency(),
             'note' => $item->getNote(),

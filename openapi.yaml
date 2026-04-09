@@ -1771,6 +1771,7 @@ paths:
                 traineeProfileId: { type: string, format: uuid }
                 supplementId: { type: string, format: uuid }
                 dosage: { type: string, nullable: true }
+                dosageUnit: { type: string, nullable: true, enum: [capsule, tablet, gram, milligram, milliliter, scoop, drop, serving] }
                 timing: { type: string, nullable: true }
                 frequency: { type: string, nullable: true }
                 note: { type: string, nullable: true }
@@ -1811,6 +1812,7 @@ paths:
               properties:
                 supplementId: { type: string, format: uuid }
                 dosage: { type: string, nullable: true }
+                dosageUnit: { type: string, nullable: true, enum: [capsule, tablet, gram, milligram, milliliter, scoop, drop, serving] }
                 timing: { type: string, nullable: true }
                 frequency: { type: string, nullable: true }
                 note: { type: string, nullable: true }
@@ -1849,6 +1851,7 @@ paths:
               properties:
                 supplementId: { type: string, format: uuid }
                 dosage: { type: string, nullable: true }
+                dosageUnit: { type: string, nullable: true, enum: [capsule, tablet, gram, milligram, milliliter, scoop, drop, serving] }
                 timing: { type: string, nullable: true }
                 frequency: { type: string, nullable: true }
                 note: { type: string, nullable: true }
@@ -2277,6 +2280,7 @@ components:
         description: { type: string }
         isActive: { type: boolean }
         sortOrder: { type: integer, nullable: true }
+        defaultDosageUnit: { type: string, nullable: true, enum: [capsule, tablet, gram, milligram, milliliter, scoop, drop, serving] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -2295,6 +2299,7 @@ components:
             type: { type: string, enum: [vitamin, mineral, sports_nutrition, other] }
             description: { type: string }
         dosage: { type: string, nullable: true }
+        dosageUnit: { type: string, nullable: true, enum: [capsule, tablet, gram, milligram, milliliter, scoop, drop, serving] }
         timing: { type: string, nullable: true }
         frequency: { type: string, nullable: true }
         note: { type: string, nullable: true }

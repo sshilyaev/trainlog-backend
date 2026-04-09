@@ -39,6 +39,9 @@ final class SupplementCatalog
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
     private ?int $sortOrder = null;
 
+    #[ORM\Column(type: Types::STRING, length: 32, nullable: true)]
+    private ?string $defaultDosageUnit = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -109,6 +112,17 @@ final class SupplementCatalog
     public function setSortOrder(?int $sortOrder): self
     {
         $this->sortOrder = $sortOrder;
+        return $this;
+    }
+
+    public function getDefaultDosageUnit(): ?string
+    {
+        return $this->defaultDosageUnit;
+    }
+
+    public function setDefaultDosageUnit(?string $defaultDosageUnit): self
+    {
+        $this->defaultDosageUnit = $defaultDosageUnit;
         return $this;
     }
 

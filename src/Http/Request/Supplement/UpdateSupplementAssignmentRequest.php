@@ -14,6 +14,12 @@ final class UpdateSupplementAssignmentRequest
     #[Assert\Length(max: 255)]
     public ?string $dosage = null;
 
+    #[Assert\Choice(
+        choices: ['capsule', 'tablet', 'gram', 'milligram', 'milliliter', 'scoop', 'drop', 'serving'],
+        message: 'dosageUnit должен быть одним из: capsule, tablet, gram, milligram, milliliter, scoop, drop, serving'
+    )]
+    public ?string $dosageUnit = null;
+
     #[Assert\Length(max: 255)]
     public ?string $timing = null;
 
@@ -29,6 +35,7 @@ final class UpdateSupplementAssignmentRequest
         return array_filter([
             'supplementId' => $this->supplementId,
             'dosage' => $this->dosage,
+            'dosageUnit' => $this->dosageUnit,
             'timing' => $this->timing,
             'frequency' => $this->frequency,
             'note' => $this->note,
