@@ -19,7 +19,7 @@ use Doctrine\ORM\EntityManagerInterface;
 final class SupplementAppService
 {
     /** @var list<string> */
-    private const DOSAGE_UNITS = ['capsule', 'tablet', 'gram', 'milligram', 'milliliter', 'scoop', 'drop', 'serving'];
+    private const DOSAGE_UNITS = ['capsule', 'tablet', 'gram', 'milligram', 'milliliter', 'iu', 'scoop', 'drop', 'serving'];
 
     public function __construct(
         private readonly SupplementCatalogRepository $supplementCatalogRepository,
@@ -88,6 +88,7 @@ final class SupplementAppService
             ->setTraineeProfile($traineeProfile)
             ->setSupplement($supplement)
             ->setDosage($this->normalizeNullableString($data['dosage'] ?? null))
+            ->setDosageValue($this->normalizeNullableString($data['dosageValue'] ?? null))
             ->setDosageUnit($this->resolveDosageUnit(
                 $data['dosageUnit'] ?? null,
                 $supplement->getDefaultDosageUnit()
@@ -130,6 +131,9 @@ final class SupplementAppService
 
         if (array_key_exists('dosage', $data)) {
             $assignment->setDosage($this->normalizeNullableString($data['dosage']));
+        }
+        if (array_key_exists('dosageValue', $data)) {
+            $assignment->setDosageValue($this->normalizeNullableString($data['dosageValue']));
         }
         if (array_key_exists('dosageUnit', $data)) {
             $assignment->setDosageUnit($this->normalizeDosageUnit($data['dosageUnit']));
@@ -175,6 +179,9 @@ final class SupplementAppService
         }
         if (array_key_exists('dosage', $raw)) {
             $data['dosage'] = $payload->dosage;
+        }
+        if (array_key_exists('dosageValue', $raw)) {
+            $data['dosageValue'] = $payload->dosageValue;
         }
         if (array_key_exists('dosageUnit', $raw)) {
             $data['dosageUnit'] = $payload->dosageUnit;
@@ -297,7 +304,8 @@ final class SupplementAppService
                 'type' => $supplement->getType(),
                 'description' => $supplement->getDescription(),
             ],
-            'dosage' => $item->getDosage(),
+            'dosage' => $item->getDosage() ?? $this->composeLegacyDosage($item->getDosageValue(), $item->getDosageUnit()),
+            'dosageValue' => $item->getDosageValue(),
             'dosageUnit' => $item->getDosageUnit(),
             'timing' => $item->getTiming(),
             'frequency' => $item->getFrequency(),
@@ -305,6 +313,19 @@ final class SupplementAppService
             'createdAt' => $item->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $item->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    private function composeLegacyDosage(?string $value, ?string $unit): ?string
+    {
+        $v = $this->normalizeNullableString($value);
+        if ($v === null) {
+            return null;
+        }
+        $u = $this->normalizeNullableString($unit);
+        if ($u === null) {
+            return $v;
+        }
+        return sprintf('%s %s', $v, $u);
     }
 }
 

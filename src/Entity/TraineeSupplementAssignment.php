@@ -35,6 +35,9 @@ final class TraineeSupplementAssignment
     #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
     private ?string $dosage = null;
 
+    #[ORM\Column(type: Types::STRING, length: 64, nullable: true)]
+    private ?string $dosageValue = null;
+
     #[ORM\Column(type: Types::STRING, length: 32, nullable: true)]
     private ?string $dosageUnit = null;
 
@@ -106,6 +109,17 @@ final class TraineeSupplementAssignment
     public function setDosage(?string $dosage): self
     {
         $this->dosage = $dosage;
+        return $this;
+    }
+
+    public function getDosageValue(): ?string
+    {
+        return $this->dosageValue;
+    }
+
+    public function setDosageValue(?string $dosageValue): self
+    {
+        $this->dosageValue = $dosageValue;
         return $this;
     }
 

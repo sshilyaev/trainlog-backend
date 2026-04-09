@@ -24,9 +24,12 @@ final class CreateSupplementAssignmentRequest
     #[Assert\Length(max: 255)]
     public ?string $dosage = null;
 
+    #[Assert\Length(max: 64)]
+    public ?string $dosageValue = null;
+
     #[Assert\Choice(
-        choices: ['capsule', 'tablet', 'gram', 'milligram', 'milliliter', 'scoop', 'drop', 'serving'],
-        message: 'dosageUnit должен быть одним из: capsule, tablet, gram, milligram, milliliter, scoop, drop, serving'
+        choices: ['capsule', 'tablet', 'gram', 'milligram', 'milliliter', 'iu', 'scoop', 'drop', 'serving'],
+        message: 'dosageUnit должен быть одним из: capsule, tablet, gram, milligram, milliliter, iu, scoop, drop, serving'
     )]
     public ?string $dosageUnit = null;
 
@@ -47,6 +50,7 @@ final class CreateSupplementAssignmentRequest
             'traineeProfileId' => $this->traineeProfileId,
             'supplementId' => $this->supplementId,
             'dosage' => $this->dosage,
+            'dosageValue' => $this->dosageValue,
             'dosageUnit' => $this->dosageUnit,
             'timing' => $this->timing,
             'frequency' => $this->frequency,
