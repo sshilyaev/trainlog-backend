@@ -398,6 +398,55 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
 
+  /api/v1/support/campaign:
+    get:
+      operationId: getSupportCampaign
+      summary: Get rewarded support campaign state
+      tags: [Support]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Current campaign state with history and counters
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCampaignResponse' }
+
+  /api/v1/support/campaign/new:
+    post:
+      operationId: createSupportCampaign
+      summary: Create a new virtual client campaign
+      tags: [Support]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSupportCampaignRequest' }
+      responses:
+        '200':
+          description: New campaign state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCampaignResponse' }
+
+  /api/v1/support/campaign/reward-claim:
+    post:
+      operationId: claimSupportCampaignReward
+      summary: Claim reward after rewarded ad completion
+      tags: [Support]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimSupportRewardRequest' }
+      responses:
+        '200':
+          description: Updated campaign state (idempotent-safe)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCampaignResponse' }
+
   # --- Measurements (under profile) ---
   /api/v1/profiles/{profileId}/measurements:
     parameters:
@@ -2128,6 +2177,62 @@ components:
             createdInPeriod:
               type: integer
               description: Memberships created in the same calendar window as uniqueWithVisitsInPeriod
+
+    CreateSupportCampaignRequest:
+      type: object
+      properties:
+        goalType:
+          type: string
+          enum: [lose_weight, gain_weight]
+
+    ClaimSupportRewardRequest:
+      type: object
+      required: [adProvider, externalEventId, rewardValueKg]
+      properties:
+        adProvider: { type: string, example: yandex }
+        externalEventId: { type: string, example: rewarded-evt-123 }
+        rewardValueKg: { type: number, format: float, minimum: 0.1, maximum: 5.0, example: 1.0 }
+
+    SupportCampaign:
+      type: object
+      required: [id, goalType, status, startWeightKg, currentWeightKg, targetWeightKg, savedClientsCount, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        goalType: { type: string, enum: [lose_weight, gain_weight] }
+        status: { type: string, enum: [active, completed] }
+        startWeightKg: { type: number, format: float }
+        currentWeightKg: { type: number, format: float }
+        targetWeightKg: { type: number, format: float }
+        savedClientsCount: { type: integer }
+        updatedAt: { type: string, format: date-time }
+
+    SupportCampaignHistoryItem:
+      type: object
+      required: [id, goalType, startWeightKg, targetWeightKg, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        goalType: { type: string, enum: [lose_weight, gain_weight] }
+        startWeightKg: { type: number, format: float }
+        targetWeightKg: { type: number, format: float }
+        createdAt: { type: string, format: date-time }
+
+    SupportCampaignMeta:
+      type: object
+      required: [rewardEventsTotal, idempotent]
+      properties:
+        rewardEventsTotal: { type: integer }
+        idempotent: { type: boolean }
+        rewardEventId: { type: string, format: uuid, nullable: true }
+
+    SupportCampaignResponse:
+      type: object
+      required: [campaign, history, meta]
+      properties:
+        campaign: { $ref: '#/components/schemas/SupportCampaign' }
+        history:
+          type: array
+          items: { $ref: '#/components/schemas/SupportCampaignHistoryItem' }
+        meta: { $ref: '#/components/schemas/SupportCampaignMeta' }
 
     Measurement:
       type: object
