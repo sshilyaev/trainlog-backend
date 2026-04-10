@@ -9,6 +9,7 @@ use App\Entity\Profile;
 use App\Entity\SupplementCatalog;
 use App\Entity\TraineeSupplementAssignment;
 use App\Enum\ApiError;
+use App\Http\Request\Supplement\SupplementDosageUnitNormalizer;
 use App\Http\Request\Supplement\UpdateSupplementAssignmentRequest;
 use App\Repository\CoachTraineeLinkRepository;
 use App\Repository\ProfileRepository;
@@ -18,9 +19,6 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class SupplementAppService
 {
-    /** @var list<string> */
-    private const DOSAGE_UNITS = ['capsule', 'tablet', 'gram', 'milligram', 'milliliter', 'iu', 'scoop', 'drop', 'serving'];
-
     public function __construct(
         private readonly SupplementCatalogRepository $supplementCatalogRepository,
         private readonly TraineeSupplementAssignmentRepository $assignmentRepository,
@@ -260,11 +258,8 @@ final class SupplementAppService
         if ($value === null) {
             return null;
         }
-        $text = trim((string) $value);
-        if ($text === '') {
-            return null;
-        }
-        return in_array($text, self::DOSAGE_UNITS, true) ? $text : null;
+
+        return SupplementDosageUnitNormalizer::normalizeOptional((string) $value);
     }
 
     private function resolveDosageUnit(mixed $requested, ?string $fallback): ?string
