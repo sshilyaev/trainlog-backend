@@ -33,7 +33,7 @@ final class CoachStatisticsAppService
      *
      * @return array{
      *   period: string,
-     *   trainees: array{activeCount: int, newThisMonth: int},
+     *   trainees: array{activeCount: int, newThisMonth: int, uniqueWithVisitsInPeriod: int},
      *   visits: array{
      *     thisMonth: int,
      *     previousMonth: int,
@@ -47,27 +47,31 @@ final class CoachStatisticsAppService
      *     previousMonthOneTimeDebt: int,
      *     previousMonthCancelled: int
      *   },
-     *   memberships: array{activeCount: int, endingSoonCount: int, unlimitedCount: int, byVisitsCount: int}
+     *   memberships: array{activeCount: int, endingSoonCount: int, unlimitedCount: int, byVisitsCount: int, createdInPeriod: int}
      * }
      */
-    public function getStatistics(string $coachProfileId, string $month, string $userId): array
+    public function getStatistics(string $coachProfileId, string $month, string $userId, int $months = 1): array
     {
         $profile = $this->profileRepository->find($coachProfileId);
         if ($profile === null || $profile->getType() !== Profile::TYPE_COACH || $profile->getUserId() !== $userId) {
             throw new ApiException(ApiError::ProfileNotFound);
         }
 
-        $cacheKey = self::CACHE_KEY_PREFIX . $coachProfileId . '.' . $month;
-        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($coachProfileId, $month): array {
+        if (!\in_array($months, [1, 3, 6], true)) {
+            $months = 1;
+        }
+
+        $cacheKey = self::CACHE_KEY_PREFIX . $coachProfileId . '.' . $month . '.m' . $months;
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($coachProfileId, $month, $months): array {
             $item->expiresAfter(self::CACHE_TTL_SECONDS);
-            return $this->computeStatistics($coachProfileId, $month);
+            return $this->computeStatistics($coachProfileId, $month, $months);
         });
     }
 
     /**
      * @return array{
      *   period: string,
-     *   trainees: array{activeCount: int, newThisMonth: int},
+     *   trainees: array{activeCount: int, newThisMonth: int, uniqueWithVisitsInPeriod: int},
      *   visits: array{
      *     thisMonth: int,
      *     previousMonth: int,
@@ -81,12 +85,24 @@ final class CoachStatisticsAppService
      *     previousMonthOneTimeDebt: int,
      *     previousMonthCancelled: int
      *   },
-     *   memberships: array{activeCount: int, endingSoonCount: int, unlimitedCount: int, byVisitsCount: int}
+     *   memberships: array{activeCount: int, endingSoonCount: int, unlimitedCount: int, byVisitsCount: int, createdInPeriod: int}
      * }
      */
-    private function computeStatistics(string $coachProfileId, string $month): array
+    private function computeStatistics(string $coachProfileId, string $month, int $months): array
     {
         $previousMonth = $this->previousMonth($month);
+
+        [$periodStart, $periodEndExclusive] = $this->periodBounds($month, $months);
+        $uniqueWithVisitsInPeriod = $this->visitRepository->countDistinctTraineesWithDoneVisitsInRange(
+            $coachProfileId,
+            $periodStart,
+            $periodEndExclusive
+        );
+        $membershipsCreatedInPeriod = $this->membershipRepository->countCreatedByCoachProfileIdInRange(
+            $coachProfileId,
+            $periodStart,
+            $periodEndExclusive
+        );
 
         $traineesActiveCount = $this->coachTraineeLinkRepository->countActiveByCoachProfileId($coachProfileId);
         $traineesNewThisMonth = $this->coachTraineeLinkRepository->countNewLinksInMonth($coachProfileId, $month);
@@ -106,6 +122,7 @@ final class CoachStatisticsAppService
             'trainees' => [
                 'activeCount' => $traineesActiveCount,
                 'newThisMonth' => $traineesNewThisMonth,
+                'uniqueWithVisitsInPeriod' => $uniqueWithVisitsInPeriod,
             ],
             'visits' => [
                 'thisMonth' => $visitsThisMonth,
@@ -125,8 +142,28 @@ final class CoachStatisticsAppService
                 'endingSoonCount' => $membershipsEndingSoonCount,
                 'unlimitedCount' => $membershipsByKind['unlimited'],
                 'byVisitsCount' => $membershipsByKind['byVisits'],
+                'createdInPeriod' => $membershipsCreatedInPeriod,
             ],
         ];
+    }
+
+    /**
+     * Интервал из ровно $months календарных месяцев, заканчивающийся выбранным $yearMonth включительно.
+     *
+     * @return array{0: \DateTimeImmutable, 1: \DateTimeImmutable} [start inclusive, end exclusive)
+     */
+    private function periodBounds(string $yearMonth, int $months): array
+    {
+        $endMonthStart = \DateTimeImmutable::createFromFormat('!Y-m', $yearMonth);
+        if ($endMonthStart === false) {
+            $endMonthStart = new \DateTimeImmutable('first day of this month');
+        }
+        $endMonthStart = $endMonthStart->setTime(0, 0);
+        $months = max(1, min(6, $months));
+        $periodStart = $endMonthStart->modify('-' . ($months - 1) . ' months');
+        $periodEndExclusive = $endMonthStart->modify('+1 month');
+
+        return [$periodStart, $periodEndExclusive];
     }
 
     private function previousMonth(string $yearMonth): string

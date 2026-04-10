@@ -212,6 +212,33 @@ final class VisitRepository extends ServiceEntityRepository
     }
 
     /**
+     * Уникальные подопечные с хотя бы одним завершённым посещением в интервале [start, end).
+     */
+    public function countDistinctTraineesWithDoneVisitsInRange(
+        string $coachProfileId,
+        \DateTimeImmutable $rangeStart,
+        \DateTimeImmutable $rangeEndExclusive,
+    ): int {
+        $start = $rangeStart->setTime(0, 0);
+        $end = $rangeEndExclusive->setTime(0, 0);
+
+        return (int) $this->createQueryBuilder('v')
+            ->select('COUNT(DISTINCT t.id)')
+            ->innerJoin('v.coachProfile', 'c')
+            ->innerJoin('v.traineeProfile', 't')
+            ->andWhere('c.id = :coachId')
+            ->andWhere('v.date >= :start')
+            ->andWhere('v.date < :end')
+            ->andWhere('v.status = :done')
+            ->setParameter('coachId', $coachProfileId)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->setParameter('done', Visit::STATUS_DONE)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * @return list<Visit>
      */
     public function findByCoachInPeriod(string $coachProfileId, \DateTimeImmutable $from, \DateTimeImmutable $to): array

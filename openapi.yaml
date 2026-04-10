@@ -379,8 +379,13 @@ paths:
         - name: month
           in: query
           required: false
-          description: Period in YYYY-MM (default current month)
+          description: Last month (inclusive) of the aggregation window in YYYY-MM (default current month)
           schema: { type: string, pattern: '^\d{4}-\d{2}$', example: '2026-03' }
+        - name: months
+          in: query
+          required: false
+          description: Length of the window in calendar months ending at `month` (1, 3, or 6). Affects `trainees.uniqueWithVisitsInPeriod` and `memberships.createdInPeriod`.
+          schema: { type: integer, enum: [1, 3, 6], default: 1 }
       responses:
         '200':
           description: Coach statistics for the period
@@ -2090,10 +2095,13 @@ components:
           example: '2026-03'
         trainees:
           type: object
-          required: [activeCount, newThisMonth]
+          required: [activeCount, newThisMonth, uniqueWithVisitsInPeriod]
           properties:
             activeCount: { type: integer, description: Number of non-archived coach–trainee links }
             newThisMonth: { type: integer, description: Links created in the selected month }
+            uniqueWithVisitsInPeriod:
+              type: integer
+              description: Distinct trainees with at least one completed visit in the window [month − (months−1), month]
         visits:
           type: object
           required: [thisMonth, previousMonth, total]
@@ -2111,12 +2119,15 @@ components:
             previousMonthCancelled: { type: integer }
         memberships:
           type: object
-          required: [activeCount, endingSoonCount]
+          required: [activeCount, endingSoonCount, createdInPeriod]
           properties:
             activeCount: { type: integer, description: Active memberships count }
             endingSoonCount: { type: integer, description: Active with 1–2 sessions left or end_date within 14 days }
             unlimitedCount: { type: integer, description: Active unlimited memberships }
             byVisitsCount: { type: integer, description: Active by-visits memberships }
+            createdInPeriod:
+              type: integer
+              description: Memberships created in the same calendar window as uniqueWithVisitsInPeriod
 
     Measurement:
       type: object

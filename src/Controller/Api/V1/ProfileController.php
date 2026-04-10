@@ -56,7 +56,12 @@ final class ProfileController extends AbstractApiController
         if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
             $month = (new \DateTimeImmutable('now'))->format('Y-m');
         }
-        return ApiResponse::success($this->coachStatisticsAppService->getStatistics($coachProfileId, $month, $this->getUserId($request)));
+        $months = (int) ($request->query->get('months') ?? 1);
+        if (!\in_array($months, [1, 3, 6], true)) {
+            $months = 1;
+        }
+
+        return ApiResponse::success($this->coachStatisticsAppService->getStatistics($coachProfileId, $month, $this->getUserId($request), $months));
     }
 
     #[Route('/profiles/{id}', name: 'profiles_update', methods: ['PATCH', 'PUT'], requirements: ['id' => '[0-9a-fA-F\-]{36}'])]

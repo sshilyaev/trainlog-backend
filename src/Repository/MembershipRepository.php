@@ -149,6 +149,27 @@ final class MembershipRepository extends ServiceEntityRepository
     /**
      * Active memberships ending soon: 1–2 sessions left (by_visits) or end_date within 14 days (unlimited).
      */
+    /**
+     * Абонементы, у которых createdAt попадает в [start, end).
+     */
+    public function countCreatedByCoachProfileIdInRange(
+        string $coachProfileId,
+        \DateTimeImmutable $rangeStart,
+        \DateTimeImmutable $rangeEndExclusive,
+    ): int {
+        return (int) $this->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->innerJoin('m.coachProfile', 'c')
+            ->andWhere('c.id = :coachId')
+            ->andWhere('m.createdAt >= :start')
+            ->andWhere('m.createdAt < :end')
+            ->setParameter('coachId', $coachProfileId)
+            ->setParameter('start', $rangeStart)
+            ->setParameter('end', $rangeEndExclusive)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function countEndingSoonByCoachProfileId(string $coachProfileId): int
     {
         $in14Days = (new \DateTimeImmutable('today'))->modify('+14 days');
