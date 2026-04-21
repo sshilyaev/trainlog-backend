@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Request\Event;
 
+use App\Entity\Event;
 use App\Enum\ValidationMessage;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -19,6 +20,8 @@ final class UpdateEventRequest
     public ?bool $remind = null;
     #[Assert\Length(max: 12)]
     public ?string $colorHex = null;
+    #[Assert\Choice(choices: [Event::TYPE_GENERAL, Event::TYPE_WORKOUT, Event::TYPE_MEASUREMENT, Event::TYPE_NUTRITION, Event::TYPE_REMINDER])]
+    public ?string $eventType = null;
     public ?bool $isCancelled = null;
 
     /** @return array<string, mixed> */
@@ -30,6 +33,7 @@ final class UpdateEventRequest
             'description' => $this->description,
             'remind' => $this->remind,
             'colorHex' => $this->colorHex,
+            'eventType' => $this->eventType,
             'isCancelled' => $this->isCancelled,
         ], static fn ($v) => $v !== null);
     }

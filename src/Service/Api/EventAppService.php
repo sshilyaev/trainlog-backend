@@ -118,7 +118,8 @@ final class EventAppService
             ->setDate($date)
             ->setDescription(isset($data['description']) ? (string) $data['description'] : null)
             ->setRemind((bool) ($data['remind'] ?? false))
-            ->setColorHex(isset($data['colorHex']) ? (string) $data['colorHex'] : null);
+            ->setColorHex(isset($data['colorHex']) ? (string) $data['colorHex'] : null)
+            ->setEventType(isset($data['eventType']) ? (string) $data['eventType'] : Event::TYPE_GENERAL);
         $this->em->persist($event);
         $this->em->flush();
         return $this->eventToArray($event);
@@ -159,6 +160,9 @@ final class EventAppService
         }
         if (array_key_exists('colorHex', $data)) {
             $event->setColorHex($data['colorHex'] === null ? null : (string) $data['colorHex']);
+        }
+        if (array_key_exists('eventType', $data)) {
+            $event->setEventType((string) $data['eventType']);
         }
         if (array_key_exists('isCancelled', $data)) {
             $event->setIsCancelled((bool) $data['isCancelled']);
@@ -201,6 +205,7 @@ final class EventAppService
             'eventDescription' => $e->getDescription(),
             'remind' => $e->isRemind(),
             'colorHex' => $e->getColorHex(),
+            'eventType' => $e->getEventType(),
             'isCancelled' => $e->isCancelled(),
             'createdAt' => $e->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];

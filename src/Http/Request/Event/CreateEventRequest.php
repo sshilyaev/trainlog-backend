@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Request\Event;
 
+use App\Entity\Event;
 use App\Enum\ValidationMessage;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -29,6 +30,8 @@ final class CreateEventRequest
     public bool $remind = false;
     #[Assert\Length(max: 12)]
     public ?string $colorHex = null;
+    #[Assert\Choice(choices: [Event::TYPE_GENERAL, Event::TYPE_WORKOUT, Event::TYPE_MEASUREMENT, Event::TYPE_NUTRITION, Event::TYPE_REMINDER])]
+    public ?string $eventType = Event::TYPE_GENERAL;
 
     /** Idempotency key for safe retry (optional). */
     public ?string $idempotencyKey = null;
@@ -44,6 +47,7 @@ final class CreateEventRequest
             'description' => $this->description,
             'remind' => $this->remind,
             'colorHex' => $this->colorHex,
+            'eventType' => $this->eventType,
         ];
         if ($this->idempotencyKey !== null && $this->idempotencyKey !== '') {
             $data['idempotencyKey'] = $this->idempotencyKey;

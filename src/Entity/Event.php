@@ -13,6 +13,12 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Index(columns: ['coach_profile_id', 'trainee_profile_id', 'date'], name: 'idx_events_coach_trainee_date')]
 class Event
 {
+    public const TYPE_GENERAL = 'general';
+    public const TYPE_WORKOUT = 'workout';
+    public const TYPE_MEASUREMENT = 'measurement';
+    public const TYPE_NUTRITION = 'nutrition';
+    public const TYPE_REMINDER = 'reminder';
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     private string $id;
@@ -39,6 +45,9 @@ class Event
 
     #[ORM\Column(length: 12, nullable: true)]
     private ?string $colorHex = null;
+
+    #[ORM\Column(length: 32, options: ['default' => self::TYPE_GENERAL])]
+    private string $eventType = self::TYPE_GENERAL;
 
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $isCancelled = false;
@@ -131,6 +140,17 @@ class Event
     public function setColorHex(?string $colorHex): self
     {
         $this->colorHex = $colorHex;
+        return $this;
+    }
+
+    public function getEventType(): string
+    {
+        return $this->eventType;
+    }
+
+    public function setEventType(string $eventType): self
+    {
+        $this->eventType = $eventType;
         return $this;
     }
 

@@ -1191,6 +1191,7 @@ paths:
                 description: { type: string, nullable: true }
                 remind: { type: boolean, default: false }
                 colorHex: { type: string, nullable: true }
+                eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder], default: general }
                 idempotencyKey: { type: string, nullable: true, description: Idempotency key for safe retry (24h TTL) }
       responses:
         '201':
@@ -1241,6 +1242,7 @@ paths:
                 description: { type: string, nullable: true }
                 remind: { type: boolean }
                 colorHex: { type: string, nullable: true }
+                eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder] }
                 isCancelled: { type: boolean }
       responses:
         '200':
@@ -2387,6 +2389,7 @@ components:
         eventDescription: { type: string, nullable: true }
         remind: { type: boolean }
         colorHex: { type: string, nullable: true }
+        eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder] }
         isCancelled: { type: boolean }
         createdAt: { type: string, format: date-time }
 
