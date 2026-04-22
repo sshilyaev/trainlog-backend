@@ -13,6 +13,9 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 final class EventRepository extends ServiceEntityRepository
 {
+    private const EFFECTIVE_START_EXPR = 'CASE WHEN e.periodStart IS NOT NULL THEN e.periodStart ELSE e.date END';
+    private const EFFECTIVE_END_EXPR = 'CASE WHEN e.periodEnd IS NOT NULL THEN e.periodEnd ELSE e.date END';
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Event::class);
@@ -28,7 +31,7 @@ final class EventRepository extends ServiceEntityRepository
             ->andWhere('t.id = :traineeId')
             ->setParameter('coachId', $coachProfileId)
             ->setParameter('traineeId', $traineeProfileId)
-            ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
+            ->orderBy(self::EFFECTIVE_START_EXPR, 'DESC')
             ->addOrderBy('e.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -53,13 +56,13 @@ final class EventRepository extends ServiceEntityRepository
             ->innerJoin('e.traineeProfile', 't')
             ->andWhere('c.id = :coachId')
             ->andWhere('t.id = :traineeId')
-            ->andWhere('COALESCE(e.periodStart, e.date) <= :end')
-            ->andWhere('COALESCE(e.periodEnd, e.date) >= :start')
+            ->andWhere(self::EFFECTIVE_START_EXPR . ' <= :end')
+            ->andWhere(self::EFFECTIVE_END_EXPR . ' >= :start')
             ->setParameter('coachId', $coachProfileId)
             ->setParameter('traineeId', $traineeProfileId)
             ->setParameter('start', $start)
             ->setParameter('end', $end)
-            ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
+            ->orderBy(self::EFFECTIVE_START_EXPR, 'DESC')
             ->addOrderBy('e.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -73,7 +76,7 @@ final class EventRepository extends ServiceEntityRepository
             ->innerJoin('e.traineeProfile', 't')
             ->andWhere('c.id = :profileId OR t.id = :profileId')
             ->setParameter('profileId', $profileId)
-            ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
+            ->orderBy(self::EFFECTIVE_START_EXPR, 'DESC')
             ->addOrderBy('e.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -93,7 +96,7 @@ final class EventRepository extends ServiceEntityRepository
                 ->innerJoin('e.traineeProfile', 't')
                 ->andWhere('c.id = :profileId OR t.id = :profileId')
                 ->setParameter('profileId', $profileId)
-                ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
+                ->orderBy(self::EFFECTIVE_START_EXPR, 'DESC')
                 ->addOrderBy('e.id', 'DESC')
                 ->setMaxResults($limit + 1);
         } elseif ($coachProfileId !== null && $traineeProfileId !== null) {
@@ -104,7 +107,7 @@ final class EventRepository extends ServiceEntityRepository
                 ->andWhere('t.id = :traineeId')
                 ->setParameter('coachId', $coachProfileId)
                 ->setParameter('traineeId', $traineeProfileId)
-                ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
+                ->orderBy(self::EFFECTIVE_START_EXPR, 'DESC')
                 ->addOrderBy('e.id', 'DESC')
                 ->setMaxResults($limit + 1);
         } else {
@@ -114,7 +117,7 @@ final class EventRepository extends ServiceEntityRepository
             $afterEvent = $this->findOneById($after);
             if ($afterEvent !== null) {
                 $afterDate = $afterEvent->getPeriodStart() ?? $afterEvent->getDate();
-                $qb->andWhere('(COALESCE(e.periodStart, e.date) < :afterDate OR (COALESCE(e.periodStart, e.date) = :afterDate AND e.id < :afterId))')
+                $qb->andWhere('(' . self::EFFECTIVE_START_EXPR . ' < :afterDate OR (' . self::EFFECTIVE_START_EXPR . ' = :afterDate AND e.id < :afterId))')
                     ->setParameter('afterDate', $afterDate)
                     ->setParameter('afterId', $after);
             }
