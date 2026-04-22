@@ -124,6 +124,9 @@ final class CoachTraineeLinkAppService
         if (array_key_exists('archived', $data)) {
             $link->setArchived((bool) $data['archived']);
         }
+        if (array_key_exists('favorite', $data)) {
+            $link->setFavorite((bool) $data['favorite']);
+        }
         $errors = $this->validator->validate($link);
         if (count($errors) > 0) {
             throw new ApiException(ApiError::ValidationFailed, null, [
@@ -160,6 +163,7 @@ final class CoachTraineeLinkAppService
             'displayName' => $link->getDisplayName(),
             'note' => $link->getNote(),
             'archived' => $link->isArchived(),
+            'favorite' => $link->isFavorite(),
             'createdAt' => $link->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }

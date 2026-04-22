@@ -172,6 +172,7 @@ final class CoachOverviewAppService
             'displayName' => $link->getDisplayName(),
             'note' => $link->getNote(),
             'archived' => $link->isArchived(),
+            'favorite' => $link->isFavorite(),
             'createdAt' => $link->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }

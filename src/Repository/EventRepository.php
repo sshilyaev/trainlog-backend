@@ -28,7 +28,7 @@ final class EventRepository extends ServiceEntityRepository
             ->andWhere('t.id = :traineeId')
             ->setParameter('coachId', $coachProfileId)
             ->setParameter('traineeId', $traineeProfileId)
-            ->orderBy('e.date', 'DESC')
+            ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
             ->addOrderBy('e.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -53,13 +53,13 @@ final class EventRepository extends ServiceEntityRepository
             ->innerJoin('e.traineeProfile', 't')
             ->andWhere('c.id = :coachId')
             ->andWhere('t.id = :traineeId')
-            ->andWhere('e.date >= :start')
-            ->andWhere('e.date <= :end')
+            ->andWhere('COALESCE(e.periodStart, e.date) <= :end')
+            ->andWhere('COALESCE(e.periodEnd, e.date) >= :start')
             ->setParameter('coachId', $coachProfileId)
             ->setParameter('traineeId', $traineeProfileId)
             ->setParameter('start', $start)
             ->setParameter('end', $end)
-            ->orderBy('e.date', 'DESC')
+            ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
             ->addOrderBy('e.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -73,7 +73,7 @@ final class EventRepository extends ServiceEntityRepository
             ->innerJoin('e.traineeProfile', 't')
             ->andWhere('c.id = :profileId OR t.id = :profileId')
             ->setParameter('profileId', $profileId)
-            ->orderBy('e.date', 'DESC')
+            ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
             ->addOrderBy('e.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -93,7 +93,7 @@ final class EventRepository extends ServiceEntityRepository
                 ->innerJoin('e.traineeProfile', 't')
                 ->andWhere('c.id = :profileId OR t.id = :profileId')
                 ->setParameter('profileId', $profileId)
-                ->orderBy('e.date', 'DESC')
+                ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
                 ->addOrderBy('e.id', 'DESC')
                 ->setMaxResults($limit + 1);
         } elseif ($coachProfileId !== null && $traineeProfileId !== null) {
@@ -104,7 +104,7 @@ final class EventRepository extends ServiceEntityRepository
                 ->andWhere('t.id = :traineeId')
                 ->setParameter('coachId', $coachProfileId)
                 ->setParameter('traineeId', $traineeProfileId)
-                ->orderBy('e.date', 'DESC')
+                ->orderBy('COALESCE(e.periodStart, e.date)', 'DESC')
                 ->addOrderBy('e.id', 'DESC')
                 ->setMaxResults($limit + 1);
         } else {
@@ -113,8 +113,9 @@ final class EventRepository extends ServiceEntityRepository
         if ($after !== null && $after !== '') {
             $afterEvent = $this->findOneById($after);
             if ($afterEvent !== null) {
-                $qb->andWhere('(e.date < :afterDate OR (e.date = :afterDate AND e.id < :afterId))')
-                    ->setParameter('afterDate', $afterEvent->getDate())
+                $afterDate = $afterEvent->getPeriodStart() ?? $afterEvent->getDate();
+                $qb->andWhere('(COALESCE(e.periodStart, e.date) < :afterDate OR (COALESCE(e.periodStart, e.date) = :afterDate AND e.id < :afterId))')
+                    ->setParameter('afterDate', $afterDate)
                     ->setParameter('afterId', $after);
             }
         }

@@ -13,11 +13,15 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Index(columns: ['coach_profile_id', 'trainee_profile_id', 'date'], name: 'idx_events_coach_trainee_date')]
 class Event
 {
+    public const MODE_DATE = 'date';
+    public const MODE_PERIOD = 'period';
     public const TYPE_GENERAL = 'general';
     public const TYPE_WORKOUT = 'workout';
     public const TYPE_MEASUREMENT = 'measurement';
     public const TYPE_NUTRITION = 'nutrition';
     public const TYPE_REMINDER = 'reminder';
+    public const TYPE_VACATION = 'vacation';
+    public const TYPE_SICK = 'sick';
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -36,6 +40,21 @@ class Event
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private \DateTimeImmutable $date;
+
+    #[ORM\Column(length: 16, options: ['default' => self::MODE_DATE])]
+    private string $mode = self::MODE_DATE;
+
+    #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $periodStart = null;
+
+    #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $periodEnd = null;
+
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $periodType = null;
+
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
+    private bool $freezeMembership = false;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
@@ -107,6 +126,61 @@ class Event
     public function setDate(\DateTimeImmutable $date): self
     {
         $this->date = $date;
+        return $this;
+    }
+
+    public function getMode(): string
+    {
+        return $this->mode;
+    }
+
+    public function setMode(string $mode): self
+    {
+        $this->mode = $mode;
+        return $this;
+    }
+
+    public function getPeriodStart(): ?\DateTimeImmutable
+    {
+        return $this->periodStart;
+    }
+
+    public function setPeriodStart(?\DateTimeImmutable $periodStart): self
+    {
+        $this->periodStart = $periodStart;
+        return $this;
+    }
+
+    public function getPeriodEnd(): ?\DateTimeImmutable
+    {
+        return $this->periodEnd;
+    }
+
+    public function setPeriodEnd(?\DateTimeImmutable $periodEnd): self
+    {
+        $this->periodEnd = $periodEnd;
+        return $this;
+    }
+
+    public function getPeriodType(): ?string
+    {
+        return $this->periodType;
+    }
+
+    public function setPeriodType(?string $periodType): self
+    {
+        $this->periodType = $periodType;
+        return $this;
+    }
+
+    public function isFreezeMembership(): bool
+    {
+        return $this->freezeMembership;
+    }
+
+    public function setFreezeMembership(bool $freezeMembership): self
+    {
+        $this->freezeMembership = $freezeMembership;
         return $this;
     }
 

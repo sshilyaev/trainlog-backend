@@ -41,6 +41,9 @@ class CoachTraineeLink
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $archived = false;
 
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
+    private bool $favorite = false;
+
     public function __construct()
     {
         $this->id = (string) Uuid::v4();
@@ -109,6 +112,17 @@ class CoachTraineeLink
     public function setArchived(bool $archived): self
     {
         $this->archived = $archived;
+        return $this;
+    }
+
+    public function isFavorite(): bool
+    {
+        return $this->favorite;
+    }
+
+    public function setFavorite(bool $favorite): self
+    {
+        $this->favorite = $favorite;
         return $this;
     }
 }

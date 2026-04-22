@@ -105,17 +105,17 @@ final class EventAppService
         if ($coachProfile === null || $traineeProfile === null) {
             throw new ApiException(ApiError::ProfileNotFound);
         }
-        $dateStr = $data['date'] ?? '';
-        try {
-            $date = new \DateTimeImmutable($dateStr);
-        } catch (\Throwable) {
-            throw new ApiException(ApiError::InvalidDateFormat);
-        }
+        [$mode, $date, $periodStart, $periodEnd, $periodType, $freezeMembership] = $this->resolveEventPeriodData($data);
         $event = (new Event())
             ->setCoachProfile($coachProfile)
             ->setTraineeProfile($traineeProfile)
             ->setTitle((string) ($data['title'] ?? ''))
             ->setDate($date)
+            ->setMode($mode)
+            ->setPeriodStart($periodStart)
+            ->setPeriodEnd($periodEnd)
+            ->setPeriodType($periodType)
+            ->setFreezeMembership($freezeMembership)
             ->setDescription(isset($data['description']) ? (string) $data['description'] : null)
             ->setRemind((bool) ($data['remind'] ?? false))
             ->setColorHex(isset($data['colorHex']) ? (string) $data['colorHex'] : null)
@@ -145,12 +145,30 @@ final class EventAppService
         if (isset($data['title'])) {
             $event->setTitle((string) $data['title']);
         }
-        if (isset($data['date'])) {
-            try {
-                $event->setDate(new \DateTimeImmutable((string) $data['date']));
-            } catch (\Throwable) {
-                throw new ApiException(ApiError::InvalidDateFormat);
-            }
+        if (
+            array_key_exists('date', $data)
+            || array_key_exists('mode', $data)
+            || array_key_exists('periodStart', $data)
+            || array_key_exists('periodEnd', $data)
+            || array_key_exists('periodType', $data)
+            || array_key_exists('freezeMembership', $data)
+        ) {
+            $merged = [
+                'mode' => $data['mode'] ?? $event->getMode(),
+                'date' => $data['date'] ?? $event->getDate()->format('Y-m-d'),
+                'periodStart' => $data['periodStart'] ?? ($event->getPeriodStart()?->format('Y-m-d')),
+                'periodEnd' => $data['periodEnd'] ?? ($event->getPeriodEnd()?->format('Y-m-d')),
+                'periodType' => array_key_exists('periodType', $data) ? $data['periodType'] : $event->getPeriodType(),
+                'freezeMembership' => array_key_exists('freezeMembership', $data) ? (bool) $data['freezeMembership'] : $event->isFreezeMembership(),
+            ];
+            [$mode, $date, $periodStart, $periodEnd, $periodType, $freezeMembership] = $this->resolveEventPeriodData($merged);
+            $event
+                ->setMode($mode)
+                ->setDate($date)
+                ->setPeriodStart($periodStart)
+                ->setPeriodEnd($periodEnd)
+                ->setPeriodType($periodType)
+                ->setFreezeMembership($freezeMembership);
         }
         if (array_key_exists('description', $data)) {
             $event->setDescription($data['description'] === null ? null : (string) $data['description']);
@@ -196,12 +214,19 @@ final class EventAppService
     /** @return array<string, mixed> */
     private function eventToArray(Event $e): array
     {
+        $periodStart = $e->getPeriodStart() ?? $e->getDate();
+        $periodEnd = $e->getPeriodEnd() ?? $e->getDate();
         return [
             'id' => $e->getId(),
             'coachProfileId' => $e->getCoachProfile()->getId(),
             'traineeProfileId' => $e->getTraineeProfile()->getId(),
             'title' => $e->getTitle(),
-            'date' => $e->getDate()->format('Y-m-d'),
+            'date' => $periodStart->format('Y-m-d'),
+            'mode' => $e->getMode(),
+            'periodStart' => $periodStart->format('Y-m-d'),
+            'periodEnd' => $periodEnd->format('Y-m-d'),
+            'periodType' => $e->getPeriodType(),
+            'freezeMembership' => $e->isFreezeMembership(),
             'eventDescription' => $e->getDescription(),
             'remind' => $e->isRemind(),
             'colorHex' => $e->getColorHex(),
@@ -209,5 +234,48 @@ final class EventAppService
             'isCancelled' => $e->isCancelled(),
             'createdAt' => $e->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array{0:string,1:\DateTimeImmutable,2:\DateTimeImmutable,3:\DateTimeImmutable,4:?string,5:bool}
+     */
+    private function resolveEventPeriodData(array $data): array
+    {
+        $mode = (string) ($data['mode'] ?? Event::MODE_DATE);
+        if ($mode !== Event::MODE_DATE && $mode !== Event::MODE_PERIOD) {
+            throw new ApiException(ApiError::ValidationFailed, null, ['messages' => ['Некорректный mode для события']]);
+        }
+
+        $parseDate = static function (?string $value, string $errorText): \DateTimeImmutable {
+            try {
+                return new \DateTimeImmutable((string) $value);
+            } catch (\Throwable) {
+                throw new ApiException(ApiError::ValidationFailed, null, ['messages' => [$errorText]]);
+            }
+        };
+
+        if ($mode === Event::MODE_PERIOD) {
+            $periodStartRaw = $data['periodStart'] ?? null;
+            $periodEndRaw = $data['periodEnd'] ?? null;
+            if ($periodStartRaw === null || $periodEndRaw === null) {
+                throw new ApiException(ApiError::ValidationFailed, null, ['messages' => ['Для периода обязательны periodStart и periodEnd']]);
+            }
+            $periodStart = $parseDate((string) $periodStartRaw, 'Некорректный формат periodStart');
+            $periodEnd = $parseDate((string) $periodEndRaw, 'Некорректный формат periodEnd');
+            if ($periodStart > $periodEnd) {
+                throw new ApiException(ApiError::ValidationFailed, null, ['messages' => ['periodStart не может быть позже periodEnd']]);
+            }
+            $periodType = isset($data['periodType']) && $data['periodType'] !== '' ? (string) $data['periodType'] : null;
+            if ($periodType !== null && !in_array($periodType, [Event::TYPE_VACATION, Event::TYPE_SICK], true)) {
+                throw new ApiException(ApiError::ValidationFailed, null, ['messages' => ['periodType должен быть vacation или sick']]);
+            }
+            $freezeMembership = (bool) ($data['freezeMembership'] ?? false);
+            return [Event::MODE_PERIOD, $periodStart, $periodStart, $periodEnd, $periodType, $freezeMembership];
+        }
+
+        $dateStr = $data['date'] ?? '';
+        $date = $parseDate((string) $dateStr, ApiError::InvalidDateFormat->value);
+        return [Event::MODE_DATE, $date, $date, $date, null, false];
     }
 }

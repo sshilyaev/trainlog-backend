@@ -1182,16 +1182,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [coachProfileId, traineeProfileId, title, date]
+              required: [coachProfileId, traineeProfileId, title, mode]
               properties:
                 coachProfileId: { type: string, format: uuid }
                 traineeProfileId: { type: string, format: uuid }
                 title: { type: string }
+                mode: { type: string, enum: [date, period], default: date }
                 date: { type: string, format: date }
+                periodStart: { type: string, format: date, nullable: true }
+                periodEnd: { type: string, format: date, nullable: true }
+                periodType: { type: string, nullable: true, enum: [vacation, sick] }
+                freezeMembership: { type: boolean, default: false }
                 description: { type: string, nullable: true }
                 remind: { type: boolean, default: false }
                 colorHex: { type: string, nullable: true }
-                eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder], default: general }
+                eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder, vacation, sick], default: general }
                 idempotencyKey: { type: string, nullable: true, description: Idempotency key for safe retry (24h TTL) }
       responses:
         '201':
@@ -1238,11 +1243,16 @@ paths:
               type: object
               properties:
                 title: { type: string }
+                mode: { type: string, enum: [date, period] }
                 date: { type: string, format: date }
+                periodStart: { type: string, format: date, nullable: true }
+                periodEnd: { type: string, format: date, nullable: true }
+                periodType: { type: string, nullable: true, enum: [vacation, sick] }
+                freezeMembership: { type: boolean }
                 description: { type: string, nullable: true }
                 remind: { type: boolean }
                 colorHex: { type: string, nullable: true }
-                eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder] }
+                eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder, vacation, sick] }
                 isCancelled: { type: boolean }
       responses:
         '200':
@@ -2327,6 +2337,7 @@ components:
         displayName: { type: string, nullable: true }
         note: { type: string, nullable: true }
         archived: { type: boolean, description: Архив (подопечный скрыт внизу списка) }
+        favorite: { type: boolean, description: Избранный подопечный (показывать выше в списке) }
         createdAt: { type: string, format: date-time }
 
     Membership:
@@ -2386,10 +2397,15 @@ components:
         traineeProfileId: { type: string, format: uuid }
         title: { type: string }
         date: { type: string, format: date }
+        mode: { type: string, enum: [date, period] }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+        periodType: { type: string, nullable: true, enum: [vacation, sick] }
+        freezeMembership: { type: boolean }
         eventDescription: { type: string, nullable: true }
         remind: { type: boolean }
         colorHex: { type: string, nullable: true }
-        eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder] }
+        eventType: { type: string, enum: [general, workout, measurement, nutrition, reminder, vacation, sick] }
         isCancelled: { type: boolean }
         createdAt: { type: string, format: date-time }
 

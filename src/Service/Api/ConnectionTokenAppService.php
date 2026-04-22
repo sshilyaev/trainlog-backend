@@ -116,6 +116,7 @@ final class ConnectionTokenAppService
             'traineeProfileId' => $link->getTraineeProfile()->getId(),
             'displayName' => $link->getDisplayName(),
             'note' => $link->getNote(),
+            'favorite' => $link->isFavorite(),
             'createdAt' => $link->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }

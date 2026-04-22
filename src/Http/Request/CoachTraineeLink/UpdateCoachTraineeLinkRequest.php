@@ -9,6 +9,7 @@ final class UpdateCoachTraineeLinkRequest
     public ?string $displayName = null;
     public ?string $note = null;
     public ?bool $archived = null;
+    public ?bool $favorite = null;
 
     /** @return array<string, mixed> */
     public function toArray(): array
@@ -17,6 +18,7 @@ final class UpdateCoachTraineeLinkRequest
             'displayName' => $this->displayName,
             'note' => $this->note,
             'archived' => $this->archived,
+            'favorite' => $this->favorite,
         ], static fn ($v) => $v !== null);
     }
 }
