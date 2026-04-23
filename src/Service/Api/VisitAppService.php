@@ -144,7 +144,10 @@ final class VisitAppService
                 $visit->setMembership($membership)
                     ->setMembershipDisplayCode($membership->getDisplayCode())
                     ->setPaymentStatus(Visit::PAYMENT_PAID);
-                if ($membership->getUsedSessions() >= $membership->getTotalSessions()) {
+                if (
+                    $membership->getKind() === Membership::KIND_BY_VISITS
+                    && $membership->getUsedSessions() >= $membership->getTotalSessions()
+                ) {
                     $membership->setStatus(Membership::STATUS_FINISHED);
                 }
             } else {
@@ -160,7 +163,10 @@ final class VisitAppService
                 $visit->setMembership($membership)
                     ->setMembershipDisplayCode($membership->getDisplayCode())
                     ->setPaymentStatus(Visit::PAYMENT_PAID);
-                if ($membership->getUsedSessions() >= $membership->getTotalSessions()) {
+                if (
+                    $membership->getKind() === Membership::KIND_BY_VISITS
+                    && $membership->getUsedSessions() >= $membership->getTotalSessions()
+                ) {
                     $membership->setStatus(Membership::STATUS_FINISHED);
                 }
             } else {
@@ -234,7 +240,10 @@ final class VisitAppService
             $visit->setMembership($membership)
                 ->setMembershipDisplayCode($membership->getDisplayCode())
                 ->setPaymentStatus(Visit::PAYMENT_PAID);
-            if ($membership->getUsedSessions() >= $membership->getTotalSessions()) {
+            if (
+                $membership->getKind() === Membership::KIND_BY_VISITS
+                && $membership->getUsedSessions() >= $membership->getTotalSessions()
+            ) {
                 $membership->setStatus(Membership::STATUS_FINISHED);
             }
             $this->em->flush();
