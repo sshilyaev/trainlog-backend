@@ -112,6 +112,26 @@ final class MembershipRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function findLatestActiveUnlimitedForPair(string $coachProfileId, string $traineeProfileId): ?Membership
+    {
+        $result = $this->createQueryBuilder('m')
+            ->innerJoin('m.coachProfile', 'c')
+            ->innerJoin('m.traineeProfile', 't')
+            ->andWhere('c.id = :coachId')
+            ->andWhere('t.id = :traineeId')
+            ->andWhere('m.status = :status')
+            ->andWhere('m.kind = :kind')
+            ->setParameter('coachId', $coachProfileId)
+            ->setParameter('traineeId', $traineeProfileId)
+            ->setParameter('status', Membership::STATUS_ACTIVE)
+            ->setParameter('kind', Membership::KIND_UNLIMITED)
+            ->orderBy('m.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getResult();
+        return $result[0] ?? null;
+    }
+
     /**
      * Active memberships count by kind: unlimited and by_visits.
      *

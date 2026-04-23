@@ -6,6 +6,7 @@ namespace App\Service\Api;
 
 use App\Api\ApiException;
 use App\Entity\Event;
+use App\Repository\MembershipRepository;
 use App\Enum\ApiError;
 use App\Repository\EventRepository;
 use App\Repository\ProfileRepository;
@@ -20,6 +21,7 @@ final class EventAppService
 
     public function __construct(
         private readonly EventRepository $eventRepository,
+        private readonly MembershipRepository $membershipRepository,
         private readonly ProfileRepository $profileRepository,
         private readonly ProfileAccessChecker $profileAccessChecker,
         private readonly EntityManagerInterface $em,
@@ -122,6 +124,7 @@ final class EventAppService
             ->setEventType(isset($data['eventType']) ? (string) $data['eventType'] : Event::TYPE_GENERAL);
         $this->em->persist($event);
         $this->em->flush();
+        $this->syncFreezeDaysForPair($coachProfileId, $traineeProfileId);
         return $this->eventToArray($event);
     }
 
@@ -186,6 +189,10 @@ final class EventAppService
             $event->setIsCancelled((bool) $data['isCancelled']);
         }
         $this->em->flush();
+        $this->syncFreezeDaysForPair(
+            $event->getCoachProfile()->getId(),
+            $event->getTraineeProfile()->getId()
+        );
         return $this->eventToArray($event);
     }
 
@@ -195,8 +202,11 @@ final class EventAppService
         if ($event === null || !$this->canAccessEvent($event, $userId)) {
             throw new ApiException(ApiError::EventNotFound);
         }
+        $coachProfileId = $event->getCoachProfile()->getId();
+        $traineeProfileId = $event->getTraineeProfile()->getId();
         $this->em->remove($event);
         $this->em->flush();
+        $this->syncFreezeDaysForPair($coachProfileId, $traineeProfileId);
     }
 
     private function canAccessEvent(Event $event, string $userId): bool
@@ -277,5 +287,39 @@ final class EventAppService
         $dateStr = $data['date'] ?? '';
         $date = $parseDate((string) $dateStr, ApiError::InvalidDateFormat->value);
         return [Event::MODE_DATE, $date, $date, $date, null, false];
+    }
+
+    private function syncFreezeDaysForPair(string $coachProfileId, string $traineeProfileId): void
+    {
+        $membership = $this->membershipRepository->findLatestActiveUnlimitedForPair($coachProfileId, $traineeProfileId);
+        if ($membership === null) {
+            return;
+        }
+
+        $events = $this->eventRepository->findByCoachAndTrainee($coachProfileId, $traineeProfileId);
+        $totalFreezeDays = 0;
+        foreach ($events as $event) {
+            if (
+                $event->isCancelled()
+                || $event->getMode() !== Event::MODE_PERIOD
+                || !$event->isFreezeMembership()
+            ) {
+                continue;
+            }
+
+            $start = $event->getPeriodStart() ?? $event->getDate();
+            $end = $event->getPeriodEnd() ?? $event->getDate();
+            if ($end < $start) {
+                continue;
+            }
+
+            $days = (int) $start->diff($end)->format('%a') + 1;
+            $totalFreezeDays += max(0, $days);
+        }
+
+        if ($membership->getFreezeDays() !== $totalFreezeDays) {
+            $membership->setFreezeDays($totalFreezeDays);
+            $this->em->flush();
+        }
     }
 }
