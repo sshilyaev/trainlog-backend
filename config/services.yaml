@@ -9,6 +9,7 @@
 parameters:
     firebase_project_id_default: ''
     router_default_uri: 'https://train.tallybase.ru'
+    jwt_secret_default: ''
 
 services:
     # default configuration for services in *this* file
@@ -25,6 +26,16 @@ services:
     App\Service\FirebaseIdTokenVerifier:
         arguments:
             $projectId: '%env(default:firebase_project_id_default:FIREBASE_PROJECT_ID)%'
+
+    # Native JWT auth service — reads secret from JWT_SECRET env var
+    App\Service\JwtService:
+        arguments:
+            $secret: '%env(default:jwt_secret_default:JWT_SECRET)%'
+
+    # Disable Firebase auth subscriber — replaced by JwtAuthSubscriber
+    App\EventSubscriber\FirebaseAuthSubscriber:
+        autoconfigure: false
+        tags: []
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
