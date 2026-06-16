@@ -6,6 +6,7 @@ services:
       DATABASE_URL: postgresql://trainlog:${POSTGRES_PASSWORD:-trainlog}@postgres:5432/trainlog?serverVersion=15
       REDIS_URL: redis://redis:6379
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:-}
     volumes:
       - type: volume
         source: app_var
