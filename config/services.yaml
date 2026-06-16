@@ -37,5 +37,10 @@ services:
         autoconfigure: false
         tags: []
 
+    # CORS must run before routing (OPTIONS preflight has no matching route)
+    App\EventSubscriber\CorsSubscriber:
+        tags:
+            - { name: kernel.event_subscriber }
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
